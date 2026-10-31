@@ -1,9 +1,15 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
+import catalog from "../../../meshlyy-master-catalog.json";
+import imageReferences from "../../../meshlyy-source-image-references.json";
 import {useRetailerStore,supabase} from "../catalog/use-retailer-store";
 type Reservation={id:string;store_id:string;status:string;requested_at:string;accepted_at:string|null;expires_at:string|null;pickup_minutes:number};
 type Item={reservation_id:string;product_id:string;quantity:number;price_at_request:number};
+type Product={id:string;name:string;category:string;packSize:string|null};
+const productById=new Map((catalog as Product[]).map(p=>[p.id,p]));
+const sourceImages=imageReferences as Record<string,{url:string}>;
+const productImage=(p?:Product)=>p?sourceImages[p.name.toLowerCase().replace(/[^a-z0-9]+/g," ").trim()]?.url:null;
 const card:React.CSSProperties={border:"1px solid #d9e8e1",background:"#fff",borderRadius:18,padding:22};
 const btn:React.CSSProperties={border:0,background:"#143e38",color:"#fff",padding:"11px 18px",borderRadius:10,cursor:"pointer",fontWeight:700};
 const fmt=(n:number)=>"₹"+n.toLocaleString("en-IN",{maximumFractionDigits:2});
@@ -40,19 +46,39 @@ export default function RetailerOrders(){
    <p style={{fontSize:12,letterSpacing:3,color:"#54877a",marginTop:38}}>MESHLYY / RETAILER STUDIO</p>
    <h1 style={{fontSize:"clamp(32px,5vw,50px)",margin:"8px 0"}}>Pickup reservations.</h1>
    <p style={{color:"#587a70",lineHeight:1.6}}>Review requests, reserve stock on acceptance and manage collection windows. Pickup only — no delivery.</p>
-   <div style={{...card,margin:"22px 0",background:"#edf6f0"}}><strong>Reservation system preview</strong><p style={{marginBottom:0,color:"#53776b"}}>Consumer checkout and verified pickup completion are not connected yet. Orders appear here only when created by a future authorized consumer flow. Expiry currently requires retailer action; automated server-side expiry is required before launch.</p></div>
+   <div style={{...card,margin:"22px 0",background:"#edf6f0"}}><strong>Reservation system preview</strong><p style={{marginBottom:0,color:"#53776b"}}>Consumer pickup requests are now connected. Verified pickup completion and automated server-side expiry are still required before launch.</p></div>
    {store.loading?<p>Loading your shop…</p>:store.error?<p role="alert">{store.error}</p>:!store.user?<div style={card}>Please <Link href="/retailer/catalog">sign in</Link> to view your shop reservations.</div>:!store.storeId?<div style={card}>Please <Link href="/retailer/catalog">create your shop</Link> first.</div>:<>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:20}}><strong>{store.storeName}</strong><button style={btn} onClick={()=>void refresh()}>Refresh orders</button></div>
      <div style={{display:"flex",gap:10,marginBottom:20}}><button style={{...btn,background:tab==="active"?"#143e38":"#e6f0e9",color:tab==="active"?"#fff":"#143e38"}} onClick={()=>setTab("active")}>Open requests ({orders.filter(o=>["requested","accepted"].includes(o.status)).length})</button><button style={{...btn,background:tab==="history"?"#143e38":"#e6f0e9",color:tab==="history"?"#fff":"#143e38"}} onClick={()=>setTab("history")}>History ({orders.filter(o=>!["requested","accepted"].includes(o.status)).length})</button></div>
      {error&&<p role="alert" style={{color:"#b33b31"}}>{error}</p>}
-     <div style={{display:"grid",gap:14}}>{filtered.map(o=>{
+     <div style={{display:"grid",gap:18}}>{filtered.map(o=>{
        const lines=items.filter(i=>i.reservation_id===o.id);
        const remaining=o.expires_at?Math.max(0,Math.ceil((new Date(o.expires_at).getTime()-now)/1000)):null;
-       return <article key={o.id} style={card}>
-         <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:12,flexWrap:"wrap"}}><div><strong>Reservation #{o.id.slice(0,8).toUpperCase()}</strong><p style={{fontSize:12,color:"#6c827a",margin:"7px 0"}}>{new Date(o.requested_at).toLocaleString("en-IN")}</p></div><strong style={{color:o.status==="accepted"?"#187a5b":"#8b6c27",textTransform:"capitalize"}}>{o.status}</strong></div>
-         <div style={{margin:"15px 0",borderTop:"1px solid #e3eee8",paddingTop:10}}>{lines.map(i=><p key={i.product_id} style={{margin:"8px 0"}}>{i.product_id} · Qty {i.quantity} · {fmt(Number(i.price_at_request)*i.quantity)}</p>)}<strong>Order value: {fmt(lines.reduce((s,i)=>s+Number(i.price_at_request)*i.quantity,0))}</strong></div>
-         {o.status==="requested"&&<div style={{display:"flex",gap:10}}><button disabled={busy===o.id} onClick={()=>void action(o.id,"accept")} style={btn}>Accept & reserve stock</button><button disabled={busy===o.id} onClick={()=>void action(o.id,"reject")} style={{...btn,background:"#f1e7e4",color:"#873d32"}}>Reject</button></div>}
-         {o.status==="accepted"&&<div><p style={{fontWeight:700,color:remaining===0?"#ad3d31":"#126a56"}}>{remaining===0?"Collection window ended":`Pickup time left: ${Math.floor((remaining||0)/60)}m ${String((remaining||0)%60).padStart(2,"0")}s`}</p>{remaining===0&&<button disabled={busy===o.id} onClick={()=>void action(o.id,"expire")} style={btn}>Expire & release stock</button>}</div>}
+       const total=lines.reduce((sum,i)=>sum+Number(i.price_at_request)*i.quantity,0);
+       const units=lines.reduce((sum,i)=>sum+i.quantity,0);
+       const isPending=o.status==="requested";
+       const isAccepted=o.status==="accepted";
+       const statusColor=isPending?"#94621d":isAccepted?"#166d54":"#677c72";
+       return <article key={o.id} style={{...card,padding:0,overflow:"hidden",boxShadow:"0 10px 28px rgba(21,65,50,.035)"}}>
+         <div style={{padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",borderBottom:"1px solid #e7efea",background:"#fcfdfb"}}>
+           <div><div style={{fontSize:11,color:"#628a7c",fontWeight:700,letterSpacing:1.5,marginBottom:7}}>PICKUP ORDER</div><strong style={{fontSize:21}}>#{o.id.slice(0,8).toUpperCase()}</strong><div style={{fontSize:12,color:"#6e887c",marginTop:5}}>{new Date(o.requested_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})} · {units} {units===1?"item":"items"}</div></div>
+           <span style={{fontSize:12,fontWeight:700,borderRadius:99,padding:"9px 13px",color:statusColor,background:isPending?"#fff4df":isAccepted?"#e7f6ed":"#eff3f0",textTransform:"capitalize"}}>● {o.status}</span>
+         </div>
+         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,310px),1fr))",gap:0}}>
+           <div style={{padding:"6px 24px 14px",minWidth:0}}>
+             {lines.map((i,index)=>{const p=productById.get(i.product_id);const image=productImage(p);return <div key={i.product_id} style={{display:"flex",gap:14,alignItems:"center",padding:"15px 0",borderBottom:index===lines.length-1?"none":"1px solid #edf2ee"}}>
+               <div style={{width:76,height:80,flex:"0 0 76px",borderRadius:11,background:"#f0f6f1",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>{image?<img src={image} alt={p?.name||"Product"} loading="lazy" referrerPolicy="no-referrer" style={{display:"block",width:"100%",height:"100%",objectFit:"contain",padding:6,boxSizing:"border-box"}}/>:<span style={{fontSize:10,color:"#749084",textAlign:"center"}}>No image</span>}</div>
+               <div style={{flex:1,minWidth:0}}><strong style={{display:"block",fontSize:14,lineHeight:1.4,overflowWrap:"anywhere"}}>{p?.name||"Unknown catalogue product"}</strong><div style={{fontSize:12,color:"#6d887c",marginTop:5}}>{p?.packSize||p?.category||"Product"} · Qty {i.quantity}</div><div style={{fontSize:12,color:"#70887d",marginTop:5}}>{fmt(Number(i.price_at_request))} each</div></div>
+               <strong style={{fontSize:15,whiteSpace:"nowrap"}}>{fmt(Number(i.price_at_request)*i.quantity)}</strong>
+             </div>;})}
+           </div>
+           <aside style={{background:"#f5faf6",borderLeft:"1px solid #e5eee7",padding:24,display:"flex",flexDirection:"column",gap:16}}>
+             <div><div style={{fontSize:11,letterSpacing:1.4,color:"#618577",fontWeight:700}}>ORDER SUMMARY</div><div style={{display:"flex",justifyContent:"space-between",marginTop:16,fontSize:14}}><span style={{color:"#688277"}}>Items ({units})</span><strong>{fmt(total)}</strong></div><div style={{display:"flex",justifyContent:"space-between",marginTop:11,fontSize:14}}><span style={{color:"#688277"}}>Pickup</span><strong style={{color:"#197354"}}>Free</strong></div><div style={{borderTop:"1px dashed #cbded1",paddingTop:16,marginTop:18,display:"flex",justifyContent:"space-between",alignItems:"center"}}><strong>Total</strong><strong style={{fontSize:25}}>{fmt(total)}</strong></div></div>
+             {isPending&&<><p style={{fontSize:12,color:"#6b867a",lineHeight:1.6,margin:0}}>Accept only if every item is available. Stock is reserved when you accept.</p><button disabled={busy===o.id} onClick={()=>void action(o.id,"accept")} style={{...btn,padding:"15px 14px",width:"100%",opacity:busy===o.id?.6:1}}>{busy===o.id?"Processing…":"✓ Accept & reserve stock"}</button><button disabled={busy===o.id} onClick={()=>void action(o.id,"reject")} style={{...btn,background:"#f3e9e6",color:"#904536",width:"100%"}}>Reject request</button></>}
+             {isAccepted&&<><div style={{background:"#e4f4e9",borderRadius:12,padding:15}}><div style={{fontSize:12,color:"#3d7965",fontWeight:700}}>PICKUP WINDOW</div><strong style={{fontSize:25,color:remaining===0?"#ad3d31":"#155d48",display:"block",marginTop:6}}>{remaining===0?"Time elapsed":`${Math.floor((remaining||0)/60)}:${String((remaining||0)%60).padStart(2,"0")}`}</strong><p style={{fontSize:12,color:"#618273",margin:"7px 0 0"}}>Awaiting verified collection workflow</p></div>{remaining===0&&<button disabled={busy===o.id} onClick={()=>void action(o.id,"expire")} style={btn}>Expire & release stock</button>}</>}
+             {!isPending&&!isAccepted&&<p style={{fontSize:13,color:"#6a8579",margin:0}}>This reservation is in your order history.</p>}
+           </aside>
+         </div>
        </article>;
      })}</div>
      {!filtered.length&&<div style={{...card,textAlign:"center",padding:45,color:"#678479"}}>{tab==="active"?"No pickup requests yet.":"No reservation history yet."}</div>}
