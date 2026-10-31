@@ -22,6 +22,8 @@ export default function LivePickup(){
  const [basket,setBasket]=useState<Record<string,number>>({});
  const [orders,setOrders]=useState<Reservation[]>([]);
  const [orderLines,setOrderLines]=useState<ReservationLine[]>([]);
+ const [pickupCodes,setPickupCodes]=useState<Record<string,string>>({});
+ const [codeBusy,setCodeBusy]=useState<string|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const [now,setNow]=useState(Date.now());
  const load=useCallback(async()=>{
@@ -56,6 +58,14 @@ export default function LivePickup(){
  const groups=Array.from(new Set(selected.map(x=>x.store_id))).map(id=>({id,name:stores.get(id)||"Shop",lines:selected.filter(x=>x.store_id===id)}));
  const change=(l:Listing,delta:number)=>{const key=l.store_id+":"+l.product_id;setBasket(old=>{const next={...old};const q=Math.min(l.stock,Math.max(0,(old[key]||0)+delta));if(q)next[key]=q;else delete next[key];return next;});};
  const login=async()=>{if(!supabase)return;setBusy(true);setMessage("");const r=register?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setBusy(false);setMessage(r.error?.message||(!r.data.session?"Check your email to confirm your account.":"Signed in."));};
+ const generateCode=async(id:string)=>{
+   if(!supabase)return;
+   setCodeBusy(id);setMessage("");
+   const result=await supabase.rpc("customer_pickup_code",{p_reservation_id:id});
+   if(result.error)setMessage(result.error.message);
+   else setPickupCodes(old=>({...old,[id]:String(result.data)}));
+   setCodeBusy(null);
+ };
  const reserve=async(group:typeof groups[number])=>{
    if(!supabase)return;
    if(!user){setMessage("Please sign in to send a pickup request.");return;}
@@ -171,6 +181,7 @@ export default function LivePickup(){
                 <div style={{display:"flex",gap:8,marginTop:15}}>{[0,1,2].map((step)=><div key={step} style={{height:6,flex:1,borderRadius:99,background:step===0?"#23765c":step===1&&accepted?"#23765c":"#d7e6da"}}/>)}</div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#678579",marginTop:9}}><span>Requested</span><span>Accepted</span><span>Collected</span></div>
               </div>
+              {accepted&&remaining!==null&&remaining>0&&<div style={{background:"#fff",border:"1px solid #d6e8dc",borderRadius:13,padding:17}}><strong style={{fontSize:13}}>Secure collection code</strong><p style={{fontSize:12,color:"#69877b",lineHeight:1.5,margin:"7px 0 12px"}}>Generate when you reach the shop. Show this code only to the shop staff.</p>{pickupCodes[o.id]?<div style={{fontSize:30,letterSpacing:7,fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#165c47",textAlign:"center"}}>{pickupCodes[o.id]}</div>:<button style={{...button,width:"100%"}} disabled={codeBusy===o.id} onClick={()=>void generateCode(o.id)}>{codeBusy===o.id?"Generating…":"Generate pickup code"}</button>}</div>}
               {accepted&&<div style={{background:"#e3f4e9",padding:20,borderRadius:15}}><div style={{fontSize:12,color:"#377963",fontWeight:700}}>YOUR PICKUP WINDOW</div><strong style={{display:"block",fontSize:34,margin:"6px 0",fontVariantNumeric:"tabular-nums",color:remaining===0?"#a14b3c":"#155b47"}}>{remaining===null?"Awaiting time":remaining===0?"Time elapsed":`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,"0")}`}</strong><p style={{fontSize:12,lineHeight:1.6,color:"#577d6b",margin:0}}>{remaining===0?"The displayed timer has ended. Wait for the shop to confirm status.":"Visit the shop before this countdown ends. Bring your reservation number."}</p></div>}
               {requested&&<div style={{padding:17,borderRadius:13,background:"#fff6e6",color:"#8c6426",fontSize:13,lineHeight:1.65}}>Your request has been sent. Please wait for the retailer to accept before travelling to the shop.</div>}
               {rejected&&<div style={{padding:17,borderRadius:13,background:"#f9eeea",color:"#8f4d40",fontSize:13,lineHeight:1.65}}>This shop couldn't fulfil the request. No stock was reserved. You can browse and request again.</div>}
