@@ -25,7 +25,7 @@ export default function RetailerCatalogPage() {
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(inventory)); }, [inventory, ready]);
   const categories = useMemo(() => ["All categories", ...Array.from(new Set(products.map(p => p.category))).sort()], []);
   const found = useMemo(() => products.filter(p => (category === "All categories" || p.category === category) && [p.name,p.brand,p.packSize,p.category].join(" ").toLowerCase().includes(query.trim().toLowerCase()) && (tab === "catalog" || inventory.some(i => i.productId === p.id))).slice(0,100), [query,category,tab,inventory]);
-  const edit = (p: Product) => { const existing = inventory.find(i => i.productId === p.id); setSelected(p); setPrice(existing ? String(existing.price) : ""); setStock(existing ? String(existing.stock) : "1"); };
+  const edit = (p: Product) => { const existing = inventory.find(i => i.productId === p.id); setSelected(p); setPrice(existing ? String(existing.price) : p.mrpReference != null && p.mrpReference > 0 ? String(p.mrpReference) : ""); setStock(existing ? String(existing.stock) : "1"); };
   const save = () => { if (!selected) return; const p = Number(price), s = Number(stock); if (!Number.isFinite(p) || p <= 0 || !Number.isInteger(s) || s < 0) return; setInventory(old => [...old.filter(i => i.productId !== selected.id), {productId:selected.id,price:p,stock:s,active:s>0}]); setSelected(null); };
   const style = { background:"#f8faf8", color:"#102e30", minHeight:"100vh", padding:"32px max(20px, calc((100vw - 1100px)/2))", fontFamily:"Arial, sans-serif" } as const;
   return <main style={style}>
@@ -44,7 +44,7 @@ export default function RetailerCatalogPage() {
     <p style={{fontSize:13,color:"#647a76"}}>Showing {found.length} matches (up to 100). Catalogue reference MRP is not your selling price. Source image previews are for internal matching only; publication requires image rights.</p>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(235px,1fr))",gap:14,marginTop:20}}>
       {found.map(p=>{ const item=inventory.find(i=>i.productId===p.id); return <article key={p.id} style={{background:"white",border:"1px solid #dce8e2",borderRadius:18,padding:20,display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{height:115,background:"#edf5ef",borderRadius:12,display:"grid",placeItems:"center",color:"#6c9286",fontSize:12,overflow:"hidden"}}>{imageFor(p) ? <img src={imageFor(p)!} alt={p.name} loading="lazy" referrerPolicy="no-referrer" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}} /> : "Image not available"}</div>
+        <div style={{height:220,background:"#edf5ef",borderRadius:12,display:"grid",placeItems:"center",color:"#6c9286",fontSize:12,overflow:"hidden"}}>{imageFor(p) ? <img src={imageFor(p)!} alt={p.name} loading="lazy" referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",padding:12,boxSizing:"border-box"}} /> : "Image not available"}</div>
         <span style={{fontSize:11,color:"#538477"}}>{p.category}</span>
         <strong style={{minHeight:42,lineHeight:1.35}}>{p.name}</strong>
         <span style={{fontSize:13,color:"#668078"}}>{[p.brand,p.packSize].filter(Boolean).join(" · ") || "Pack details unavailable"}</span>
@@ -57,11 +57,11 @@ export default function RetailerCatalogPage() {
     {!found.length && <p>No matching products. Try a different search or category.</p>}
     {selected && <div role="dialog" aria-modal="true" aria-label="Set store inventory" style={{position:"fixed",inset:0,background:"#071c1bcc",display:"grid",placeItems:"center",padding:16,zIndex:100}}>
       <div style={{background:"white",borderRadius:20,padding:28,width:"min(440px,100%)",boxSizing:"border-box"}}>
-        <h2 style={{marginTop:0}}>Add to my store</h2><p>{selected.name}</p>
-        <label style={{display:"block",margin:"16px 0"}}>Your selling price (₹)<input type="number" min="0.01" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} style={{...field,width:"100%",boxSizing:"border-box",marginTop:6}} /></label>
+        <h2 style={{marginTop:0}}>{inventory.some(i=>i.productId===selected.id) ? "Edit store product" : "Add to my store"}</h2><p>{selected.name}</p>
+        <label style={{display:"block",margin:"16px 0"}}>Your selling price (₹) · Pre-filled from reference MRP, editable<input type="number" min="0.01" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} style={{...field,width:"100%",boxSizing:"border-box",marginTop:6}} /></label>
         <label style={{display:"block",margin:"16px 0"}}>Available quantity<input type="number" min="0" step="1" value={stock} onChange={e=>setStock(e.target.value)} style={{...field,width:"100%",boxSizing:"border-box",marginTop:6}} /></label>
         <p style={{fontSize:12,color:"#607c72"}}>Zero quantity marks this product out of stock. No consumer availability is published from this preview.</p>
-        <div style={{display:"flex",gap:10}}><button onClick={()=>setSelected(null)} style={button(false)}>Cancel</button><button onClick={save} disabled={!price||Number(price)<=0||!Number.isInteger(Number(stock))||Number(stock)<0} style={button(true)}>Save product</button></div>
+        <div style={{display:"flex",gap:10}}><button onClick={()=>setSelected(null)} style={button(false)}>Cancel</button><button onClick={save} disabled={!price||Number(price)<=0||!Number.isInteger(Number(stock))||Number(stock)<0} style={button(true)}>{inventory.some(i=>i.productId===selected.id) ? "Save changes" : "Add to my store"}</button></div>
       </div>
     </div>}
   </main>;
