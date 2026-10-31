@@ -31,14 +31,11 @@ begin
  if not found or v.customer_id<>auth.uid() then raise exception 'Reservation not found'; end if;
  if v.status<>'accepted' or v.expires_at<=now() then raise exception 'Pickup window is not active'; end if;
  -- Limit code rotation to avoid abuse.
- if exists(select 1 from private.pickup_secrets where reservation_id=v.id and attempts>=5)
+ if exists(select 1 from private.pickup_secrets where reservation_id=v.id and (attempts>=5 or created_at>now()-interval '30 seconds'))
  then raise exception 'Pickup code locked; contact the shop'; end if;
- code:=lpad((floor((get_byte(gen_random_bytes(4),0)::bigint*16777216
-   +get_byte(gen_random_bytes(4),1)::bigint*65536
-   +get_byte(gen_random_bytes(4),2)::bigint*256
-   +get_byte(gen_random_bytes(4),3)::bigint)%1000000)::integer::text,6,'0');
+ code:=lpad((floor(random()*1000000))::integer::text,6,'0');
  insert into private.pickup_secrets(reservation_id,code_hash,attempts)
- values(v.id,crypt(code,gen_salt('bf')),0)
+ values(v.id,public.crypt(code,public.gen_salt('bf')),0)
  on conflict(reservation_id) do update set code_hash=excluded.code_hash,attempts=0,created_at=now();
  return code;
 end $$;
@@ -60,9 +57,9 @@ begin
  select * into secret from private.pickup_secrets where reservation_id=v.id for update;
  if not found then raise exception 'Ask customer to generate their pickup code'; end if;
  if secret.attempts>=5 then raise exception 'Code locked'; end if;
- if p_code is null or p_code !~ '^[0-9]{6}$' or crypt(p_code,secret.code_hash)<>secret.code_hash then
+ if p_code is null or p_code !~ '^[0-9]{6}$' or public.crypt(p_code,secret.code_hash)<>secret.code_hash then
    update private.pickup_secrets set attempts=attempts+1 where reservation_id=v.id;
-   raise exception 'Incorrect pickup code';
+   return 'incorrect_code';
  end if;
  update public.pickup_reservations set status='completed',completed_at=now(),updated_at=now()
  where id=v.id;
