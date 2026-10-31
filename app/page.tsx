@@ -12,7 +12,7 @@ export default function Home() {
     <main id="main" tabIndex={-1}>
       <section className="hero shell" aria-labelledby="hero-title">
         <div className="hero-title-block"><p className="eyebrow"><span className="tiny-star" aria-hidden="true">✳</span> A GOOD DAY STARTS NEARBY</p><h1 id="hero-title">A little closer.<br /><em>A lot more local.</em></h1></div>
-        <div className="hero-aside"><span className="hero-edition">THE NEIGHBOURHOOD EDIT / 01</span><p>That thing you need?<br />It might be just around<br className="desktop-break" /> the corner.</p><a className="editorial-link" href="#discover">Take a look around <Arrow down /></a><span className="hero-model">Discover nearby. Reserve. Pick up yourself.</span></div>
+        <div className="hero-aside"><span className="hero-edition">THE NEIGHBOURHOOD EDIT / 01</span><p>That thing you need?{" "}<br />It might be just around<br className="desktop-break" /> the corner.</p><a className="editorial-link" href="#discover">Take a look around <Arrow down /></a><span className="hero-model">Discover nearby. Reserve. Pick up yourself.</span></div>
       </section>
       <Discovery />
       <div className="manifesto shell"><span className="small-caps">LESS SCROLLING.<br />MORE STROLLING.</span><p>The everyday has a neighbourhood.<br /><em>Let’s get you reacquainted.</em></p><span className="manifesto-flower" aria-hidden="true">✳</span></div>

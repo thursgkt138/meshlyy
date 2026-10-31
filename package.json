@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:preview": "node scripts/preview-smoke.mjs"
   },
   "dependencies": {
     "next": "^15.5.0",
