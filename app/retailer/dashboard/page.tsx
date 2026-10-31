@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import catalog from "../../meshlyy-master-catalog.json";
+import catalog from "../../../meshlyy-master-catalog.json";
 import { useRetailerStore } from "../catalog/use-retailer-store";
 
 type Product = {id:string;name:string;category:string;packSize:string|null;mrpReference:number|null};
