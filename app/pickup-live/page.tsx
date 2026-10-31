@@ -51,6 +51,22 @@ export default function LivePickup(){
    return ()=>data.subscription.unsubscribe();
  },[]);
  useEffect(()=>{void loadOrders();},[loadOrders]);
+ // Codes are issued by the database when the retailer accepts. Retrieve automatically.
+ const acceptedIds=orders.filter(o=>o.status==="accepted"&&o.expires_at&&new Date(o.expires_at).getTime()>now).map(o=>o.id).join(",");
+ useEffect(()=>{
+   if(!supabase||!user||!acceptedIds)return;
+   let cancelled=false;
+   for(const id of acceptedIds.split(",")){
+     if(pickupCodes[id])continue;
+     void supabase.rpc("customer_pickup_code",{p_reservation_id:id}).then(({data,error})=>{
+       if(cancelled)return;
+       if(error){setMessage("Pickup code: "+error.message);return;}
+       if(data)setPickupCodes(old=>({...old,[id]:String(data)}));
+     });
+   }
+   return ()=>{cancelled=true;};
+ // Run only when the set of accepted reservations changes, not every countdown tick.
+ },[acceptedIds,user]);
  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return ()=>clearInterval(id);},[]);
  const filtered=listings.filter(l=>[products.get(l.product_id)?.name,products.get(l.product_id)?.category,l.store_name,l.locality].join(" ").toLowerCase().includes(query.toLowerCase()));
  const stores=useMemo(()=>new Map(listings.map(l=>[l.store_id,l.store_name])),[listings]);
@@ -181,7 +197,7 @@ export default function LivePickup(){
                 <div style={{display:"flex",gap:8,marginTop:15}}>{[0,1,2].map((step)=><div key={step} style={{height:6,flex:1,borderRadius:99,background:step===0?"#23765c":step===1&&accepted?"#23765c":"#d7e6da"}}/>)}</div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#678579",marginTop:9}}><span>Requested</span><span>Accepted</span><span>Collected</span></div>
               </div>
-              {accepted&&remaining!==null&&remaining>0&&<div style={{background:"#fff",border:"1px solid #d6e8dc",borderRadius:13,padding:17}}><strong style={{fontSize:13}}>Secure collection code</strong><p style={{fontSize:12,color:"#69877b",lineHeight:1.5,margin:"7px 0 12px"}}>Generate when you reach the shop. Show this code only to the shop staff.</p>{pickupCodes[o.id]?<div style={{fontSize:30,letterSpacing:7,fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#165c47",textAlign:"center"}}>{pickupCodes[o.id]}</div>:<button style={{...button,width:"100%"}} disabled={codeBusy===o.id} onClick={()=>void generateCode(o.id)}>{codeBusy===o.id?"Generating…":"Generate pickup code"}</button>}</div>}
+              {accepted&&remaining!==null&&remaining>0&&<div style={{background:"#fff",border:"1px solid #d6e8dc",borderRadius:13,padding:17}}><strong style={{fontSize:13}}>Your secure pickup code</strong><p style={{fontSize:12,color:"#69877b",lineHeight:1.5,margin:"7px 0 12px"}}>Automatically issued when the shop accepts. Share only with shop staff at collection.</p>{pickupCodes[o.id]?<div aria-label="Six digit pickup code" style={{fontSize:30,letterSpacing:7,fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#165c47",textAlign:"center"}}>{pickupCodes[o.id]}</div>:<p role="status" style={{fontSize:13,color:"#69877b"}}>Loading your pickup code…</p>}</div>}
               {accepted&&<div style={{background:"#e3f4e9",padding:20,borderRadius:15}}><div style={{fontSize:12,color:"#377963",fontWeight:700}}>YOUR PICKUP WINDOW</div><strong style={{display:"block",fontSize:34,margin:"6px 0",fontVariantNumeric:"tabular-nums",color:remaining===0?"#a14b3c":"#155b47"}}>{remaining===null?"Awaiting time":remaining===0?"Time elapsed":`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,"0")}`}</strong><p style={{fontSize:12,lineHeight:1.6,color:"#577d6b",margin:0}}>{remaining===0?"The displayed timer has ended. Wait for the shop to confirm status.":"Visit the shop before this countdown ends. Bring your reservation number."}</p></div>}
               {requested&&<div style={{padding:17,borderRadius:13,background:"#fff6e6",color:"#8c6426",fontSize:13,lineHeight:1.65}}>Your request has been sent. Please wait for the retailer to accept before travelling to the shop.</div>}
               {rejected&&<div style={{padding:17,borderRadius:13,background:"#f9eeea",color:"#8f4d40",fontSize:13,lineHeight:1.65}}>This shop couldn't fulfil the request. No stock was reserved. You can browse and request again.</div>}
