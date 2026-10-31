@@ -6,12 +6,12 @@ returns trigger language plpgsql security definer set search_path = '' as $$
 declare v_code text;
 begin
  if new.status = 'accepted' and old.status is distinct from 'accepted' then
-   v_code := lpad(((get_byte(public.gen_random_bytes(4),0)::bigint * 16777216
-       + get_byte(public.gen_random_bytes(4),1)::bigint * 65536
-       + get_byte(public.gen_random_bytes(4),2)::bigint * 256
-       + get_byte(public.gen_random_bytes(4),3)::bigint) % 1000000)::text,6,'0');
+   v_code := lpad(((get_byte(extensions.gen_random_bytes(4),0)::bigint * 16777216
+       + get_byte(extensions.gen_random_bytes(4),1)::bigint * 65536
+       + get_byte(extensions.gen_random_bytes(4),2)::bigint * 256
+       + get_byte(extensions.gen_random_bytes(4),3)::bigint) % 1000000)::text,6,'0');
    insert into private.pickup_secrets(reservation_id,code_hash,pickup_code,attempts)
-   values(new.id,public.crypt(v_code,public.gen_salt('bf')),v_code,0)
+   values(new.id,extensions.crypt(v_code,extensions.gen_salt('bf')),v_code,0)
    on conflict(reservation_id) do update
      set code_hash=excluded.code_hash,pickup_code=excluded.pickup_code,attempts=0,created_at=now();
  end if;
@@ -31,7 +31,7 @@ begin
  loop
    v_code := lpad((floor(random()*1000000)::integer)::text,6,'0');
    insert into private.pickup_secrets(reservation_id,code_hash,pickup_code,attempts)
-   values(v.id,public.crypt(v_code,public.gen_salt('bf')),v_code,0)
+   values(v.id,extensions.crypt(v_code,extensions.gen_salt('bf')),v_code,0)
    on conflict(reservation_id) do update set code_hash=excluded.code_hash,pickup_code=excluded.pickup_code,attempts=0,created_at=now();
  end loop;
 end $$;
