@@ -7,6 +7,7 @@ import {supabase} from "../retailer/catalog/use-retailer-store";
 type Product={id:string;name:string;category:string;packSize:string|null};
 type Listing={store_id:string;store_name:string;locality:string|null;product_id:string;price:number;stock:number};
 type Reservation={id:string;store_id:string;status:string;requested_at:string;expires_at:string|null};
+type ReservationLine={reservation_id:string;product_id:string;quantity:number;price_at_request:number};
 const products=new Map((catalog as Product[]).map(p=>[p.id,p]));
 const refs=images as Record<string,{url:string}>;
 const imageFor=(p?:Product)=>p?refs[p.name.toLowerCase().replace(/[^a-z0-9]+/g," ").trim()]?.url:null;
@@ -20,6 +21,7 @@ export default function LivePickup(){
  const [listings,setListings]=useState<Listing[]>([]);
  const [basket,setBasket]=useState<Record<string,number>>({});
  const [orders,setOrders]=useState<Reservation[]>([]);
+ const [orderLines,setOrderLines]=useState<ReservationLine[]>([]);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const [now,setNow]=useState(Date.now());
  const load=useCallback(async()=>{
@@ -31,7 +33,13 @@ export default function LivePickup(){
  const loadOrders=useCallback(async()=>{
    if(!supabase||!user)return;
    const {data,error}=await supabase.from("pickup_reservations").select("id,store_id,status,requested_at,expires_at").order("requested_at",{ascending:false}).limit(20);
-   if(!error)setOrders((data||[]) as Reservation[]);
+   if(error){setMessage(error.message);return;}
+   const rows=(data||[]) as Reservation[];
+   setOrders(rows);
+   if(!rows.length){setOrderLines([]);return;}
+   const details=await supabase.from("pickup_reservation_items").select("reservation_id,product_id,quantity,price_at_request").in("reservation_id",rows.map(o=>o.id));
+   if(details.error)setMessage(details.error.message);
+   else setOrderLines((details.data||[]) as ReservationLine[]);
  },[user]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{
@@ -129,7 +137,51 @@ export default function LivePickup(){
       </div>;
     })}
   </section>
-  {user&&<section style={{marginTop:32}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2>Your reservations</h2><button style={{...button,background:"#e6f0e9",color:"#143e38"}} onClick={()=>void loadOrders()}>Refresh status</button></div>{orders.length===0?<p>No reservations yet.</p>:orders.map(o=>{const remaining=o.expires_at?Math.max(0,Math.ceil((new Date(o.expires_at).getTime()-now)/1000)):null;return <div key={o.id} style={{border:"1px solid #d9e8e0",borderRadius:14,padding:18,background:"white",marginBottom:10}}><strong>#{o.id.slice(0,8).toUpperCase()} · {stores.get(o.store_id)||"Shop"}</strong><p style={{textTransform:"capitalize"}}>{o.status}</p>{o.status==="accepted"&&remaining!==null&&<p style={{color:"#14634f",fontWeight:700}}>{remaining>0?`Collect within ${Math.floor(remaining/60)}m ${String(remaining%60).padStart(2,"0")}s`:"Collection window ended; awaiting server confirmation"}</p>}</div>;})}</section>}
+  {user&&<section style={{marginTop:50}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",marginBottom:20}}>
+      <div><p style={{letterSpacing:2,fontSize:11,fontWeight:700,color:"#41806e",margin:"0 0 7px"}}>YOUR ORDER JOURNEY</p><h2 style={{fontSize:"clamp(28px,3vw,38px)",margin:0}}>Your reservations <span style={{fontSize:16,color:"#759187",fontWeight:400}}>({orders.length})</span></h2></div>
+      <button style={{...button,background:"#e6f0e9",color:"#143e38"}} onClick={()=>void loadOrders()}>↻ Refresh status</button>
+    </div>
+    {!orders.length?<div style={{border:"1px solid #d9e8e0",background:"white",borderRadius:18,padding:28,color:"#6c867a"}}>No reservations yet. Your pickup requests will appear here.</div>:<div style={{display:"grid",gap:18}}>
+      {orders.map(o=>{
+        const remaining=o.expires_at?Math.max(0,Math.ceil((new Date(o.expires_at).getTime()-now)/1000)):null;
+        const accepted=o.status==="accepted",requested=o.status==="requested",rejected=o.status==="rejected";
+        const lines=orderLines.filter(i=>i.reservation_id===o.id);
+        const total=lines.reduce((sum,i)=>sum+Number(i.price_at_request)*i.quantity,0);
+        const count=lines.reduce((sum,i)=>sum+i.quantity,0);
+        const statusText=requested?"Awaiting shop confirmation":accepted?"Ready for pickup":rejected?"Shop couldn't accept":o.status==="expired"?"Pickup window expired":o.status==="completed"?"Collected":o.status.charAt(0).toUpperCase()+o.status.slice(1);
+        const statusColor=accepted?"#166a52":requested?"#94661e":rejected?"#a24b3c":"#687f75";
+        const statusBg=accepted?"#e5f5eb":requested?"#fff4de":rejected?"#f9ebe7":"#eef3ef";
+        return <article key={o.id} style={{background:"white",border:"1px solid #dce8e0",borderRadius:20,overflow:"hidden",boxShadow:"0 10px 30px rgba(18,60,45,.035)"}}>
+          <div style={{padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",borderBottom:"1px solid #e8f0ea",background:"#fcfdfb"}}>
+            <div><div style={{fontSize:11,color:"#698a7d",letterSpacing:1.4,fontWeight:700,marginBottom:6}}>PICKUP RESERVATION</div><strong style={{fontSize:20}}>#{o.id.slice(0,8).toUpperCase()}</strong><p style={{fontSize:12,color:"#748d82",margin:"6px 0 0"}}>{new Date(o.requested_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})}</p></div>
+            <span style={{background:statusBg,color:statusColor,borderRadius:99,padding:"10px 14px",fontSize:12,fontWeight:700}}>● {statusText}</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,300px),1fr))"}}>
+            <div style={{padding:"22px 24px",minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}><div style={{width:38,height:38,borderRadius:11,background:"#eaf5ed",display:"grid",placeItems:"center",fontSize:20}}>⌂</div><div><div style={{fontSize:11,color:"#789085"}}>PICKUP SHOP</div><strong style={{fontSize:17}}>{stores.get(o.store_id)||"Your neighbourhood shop"}</strong></div></div>
+              {lines.length?lines.map((i,index)=>{const p=products.get(i.product_id);const photo=imageFor(p);return <div key={i.product_id} style={{display:"flex",gap:13,alignItems:"center",padding:"12px 0",borderTop:"1px solid #edf2ee"}}>
+                <div style={{height:68,width:68,flex:"0 0 68px",background:"#f0f6f1",borderRadius:11,overflow:"hidden",display:"grid",placeItems:"center"}}>{photo?<img src={photo} alt={p?.name||"Product"} referrerPolicy="no-referrer" loading="lazy" style={{width:"100%",height:"100%",objectFit:"contain",padding:6,boxSizing:"border-box"}}/>:<span style={{fontSize:10,color:"#769083"}}>No image</span>}</div>
+                <div style={{flex:1,minWidth:0}}><strong style={{fontSize:13,lineHeight:1.4,display:"block",overflowWrap:"anywhere"}}>{p?.name||"Catalogue product"}</strong><span style={{fontSize:12,color:"#789084"}}>{p?.packSize||p?.category||"Product"} · Qty {i.quantity}</span></div><strong style={{fontSize:14,whiteSpace:"nowrap"}}>{money(Number(i.price_at_request)*i.quantity)}</strong>
+              </div>; }):<p style={{color:"#738d81",fontSize:13}}>Product details unavailable.</p>}
+              {lines.length>0&&<div style={{display:"flex",justifyContent:"space-between",borderTop:"1px dashed #d4e3d9",paddingTop:15,marginTop:8,alignItems:"center"}}><span style={{fontSize:13,color:"#6b8579"}}>{count} items · Pay at shop</span><strong style={{fontSize:21}}>{money(total)}</strong></div>}
+            </div>
+            <aside style={{background:"#f4faf5",borderLeft:"1px solid #e4eee7",padding:"24px",display:"flex",flexDirection:"column",justifyContent:"center",gap:16}}>
+              <div><div style={{fontSize:11,letterSpacing:1.4,color:"#6d8a7c",fontWeight:700}}>ORDER PROGRESS</div>
+                <div style={{display:"flex",gap:8,marginTop:15}}>{[0,1,2].map((step)=><div key={step} style={{height:6,flex:1,borderRadius:99,background:step===0?"#23765c":step===1&&accepted?"#23765c":"#d7e6da"}}/>)}</div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#678579",marginTop:9}}><span>Requested</span><span>Accepted</span><span>Collected</span></div>
+              </div>
+              {accepted&&<div style={{background:"#e3f4e9",padding:20,borderRadius:15}}><div style={{fontSize:12,color:"#377963",fontWeight:700}}>YOUR PICKUP WINDOW</div><strong style={{display:"block",fontSize:34,margin:"6px 0",fontVariantNumeric:"tabular-nums",color:remaining===0?"#a14b3c":"#155b47"}}>{remaining===null?"Awaiting time":remaining===0?"Time elapsed":`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,"0")}`}</strong><p style={{fontSize:12,lineHeight:1.6,color:"#577d6b",margin:0}}>{remaining===0?"The displayed timer has ended. Wait for the shop to confirm status.":"Visit the shop before this countdown ends. Bring your reservation number."}</p></div>}
+              {requested&&<div style={{padding:17,borderRadius:13,background:"#fff6e6",color:"#8c6426",fontSize:13,lineHeight:1.65}}>Your request has been sent. Please wait for the retailer to accept before travelling to the shop.</div>}
+              {rejected&&<div style={{padding:17,borderRadius:13,background:"#f9eeea",color:"#8f4d40",fontSize:13,lineHeight:1.65}}>This shop couldn't fulfil the request. No stock was reserved. You can browse and request again.</div>}
+              {!requested&&!accepted&&!rejected&&<div style={{fontSize:13,color:"#678579",lineHeight:1.6}}>This reservation is no longer active. Check the status before visiting the shop.</div>}
+              <div style={{fontSize:12,color:"#6d877a",borderTop:"1px solid #dce9df",paddingTop:13}}>Pickup only · Pay in store · No delivery</div>
+            </aside>
+          </div>
+        </article>;
+      })}
+    </div>}
+  </section>}
   <p style={{marginTop:30,fontSize:12,color:"#6e877d"}}>Internal test preview. Source images require publication rights. No delivery, online payment or pickup OTP verification is enabled.</p>
  </main>;
 }
