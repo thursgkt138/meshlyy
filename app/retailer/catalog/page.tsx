@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import catalog from "../../../meshlyy-master-catalog.json";
 import imageReferences from "../../../meshlyy-source-image-references.json";
+import { useRetailerStore } from "./use-retailer-store";
 
 type Product = { id: string; name: string; brand: string | null; packSize: string | null; category: string; mrpReference: number | null; imageUrl: string | null; imageStatus: string };
 type InventoryItem = { productId: string; price: number; stock: number; active: boolean };
@@ -15,24 +16,43 @@ const money = (n: number | null) => n == null ? "—" : "₹" + n.toLocaleString
 export default function RetailerCatalogPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All categories");
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const remote = useRetailerStore();
+  const inventory = remote.items;
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [register,setRegister]=useState(false);
+  const [shopName,setShopName]=useState("");
+  const [locality,setLocality]=useState("");
+  const [notice,setNotice]=useState("");
   const [selected, setSelected] = useState<Product | null>(null);
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("1");
   const [tab, setTab] = useState<"catalog" | "mine">("catalog");
-  const [ready, setReady] = useState(false);
-  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem(KEY) || "[]"); if (Array.isArray(saved)) setInventory(saved); } catch {} setReady(true); }, []);
-  useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(inventory)); }, [inventory, ready]);
+
   const categories = useMemo(() => ["All categories", ...Array.from(new Set(products.map(p => p.category))).sort()], []);
   const found = useMemo(() => products.filter(p => (category === "All categories" || p.category === category) && [p.name,p.brand,p.packSize,p.category].join(" ").toLowerCase().includes(query.trim().toLowerCase()) && (tab === "catalog" || inventory.some(i => i.productId === p.id))).slice(0,100), [query,category,tab,inventory]);
   const edit = (p: Product) => { const existing = inventory.find(i => i.productId === p.id); setSelected(p); setPrice(existing ? String(existing.price) : p.mrpReference != null && p.mrpReference > 0 ? String(p.mrpReference) : ""); setStock(existing ? String(existing.stock) : "1"); };
-  const save = () => { if (!selected) return; const p = Number(price), s = Number(stock); if (!Number.isFinite(p) || p <= 0 || !Number.isInteger(s) || s < 0) return; setInventory(old => [...old.filter(i => i.productId !== selected.id), {productId:selected.id,price:p,stock:s,active:s>0}]); setSelected(null); };
+  const save = async () => { if (!selected) return; const p = Number(price), s = Number(stock); if (!Number.isFinite(p) || p <= 0 || !Number.isInteger(s) || s < 0) return; const error=await remote.save({productId:selected.id,price:p,stock:s,active:s>0}); if(error)setNotice(error);else {setNotice("Product saved to your shop.");setSelected(null);} };
   const style = { background:"#f8faf8", color:"#102e30", minHeight:"100vh", padding:"32px max(20px, calc((100vw - 1100px)/2))", fontFamily:"Arial, sans-serif" } as const;
   return <main style={style}>
     <a href="/" style={{color:"#166d64",textDecoration:"none"}}>← Meshlyy home</a>
     <p style={{letterSpacing:3,fontSize:12,marginTop:35,color:"#47736b"}}>MESHLYY · RETAILER STUDIO</p>
     <h1 style={{fontSize:"clamp(30px,5vw,52px)",margin:"10px 0"}}>Stock your neighbourhood shop.</h1>
     <p style={{color:"#53716d",maxWidth:660,lineHeight:1.6}}>Find products from the master catalogue, set your own selling price and quantity, and build your store inventory. This is a browser-local MVP preview, not a live multi-retailer database.</p>
+    <section style={{padding:20,background:"#eaf3ee",borderRadius:16,margin:"24px 0"}}>
+      <strong>Retailer account · {remote.user ? remote.user.email : "Sign in to save inventory"}</strong>
+      {remote.loading ? <p>Loading retailer account…</p> : !remote.user ? <form onSubmit={async e=>{e.preventDefault();setNotice(await remote.signIn(email,password,register)||"Signed in successfully.");}} style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>
+        <input aria-label="Email" type="email" required placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={field}/>
+        <input aria-label="Password" type="password" required minLength={6} placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} style={field}/>
+        <button type="submit" style={button(true)}>{register?"Create account":"Sign in"}</button>
+        <button type="button" onClick={()=>setRegister(!register)} style={button(false)}>{register?"Already registered? Sign in":"New retailer? Register"}</button>
+      </form> : !remote.storeId ? <form onSubmit={async e=>{e.preventDefault();setNotice(await remote.createStore(shopName,locality)||"Shop created.");}} style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>
+        <input aria-label="Shop name" required minLength={2} placeholder="Your shop name" value={shopName} onChange={e=>setShopName(e.target.value)} style={field}/>
+        <input aria-label="Locality" placeholder="Locality (optional)" value={locality} onChange={e=>setLocality(e.target.value)} style={field}/>
+        <button type="submit" style={button(true)}>Create my shop</button>
+      </form> : <div style={{marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}><span>Managing: <strong>{remote.storeName}</strong> · Inventory saved in Supabase</span><button onClick={()=>void remote.signOut()} style={button(false)}>Sign out</button></div>}
+      {(remote.error||notice) && <p role="status" style={{color:"#8a3025"}}>{remote.error||notice}</p>}
+    </section>
     <div style={{display:"flex",gap:12,flexWrap:"wrap",margin:"25px 0"}}>
       <button onClick={()=>setTab("catalog")} style={button(tab==="catalog")}>Master catalogue ({products.length})</button>
       <button onClick={()=>setTab("mine")} style={button(tab==="mine")}>My store ({inventory.length})</button>
@@ -50,8 +70,8 @@ export default function RetailerCatalogPage() {
         <span style={{fontSize:13,color:"#668078"}}>{[p.brand,p.packSize].filter(Boolean).join(" · ") || "Pack details unavailable"}</span>
         <span style={{fontSize:13}}>Reference MRP: {money(p.mrpReference)}</span>
         {item && <span style={{fontSize:13,color:"#126a59"}}>Your price {money(item.price)} · {item.stock} in stock · {item.active?"Active":"Out of stock"}</span>}
-        <button onClick={()=>edit(p)} style={{...button(true),marginTop:"auto"}}>{item?"Edit inventory":"+ Add to my store"}</button>
-        {item && <button onClick={()=>setInventory(old=>old.filter(i=>i.productId!==p.id))} style={button(false)}>Remove from store</button>}
+        <button onClick={()=>edit(p)} disabled={!remote.storeId} style={{...button(true),marginTop:"auto",opacity:remote.storeId?1:0.5}}>{item?"Edit inventory":"+ Add to my store"}</button>
+        {item && <button onClick={async()=>{const error=await remote.remove(p.id);if(error)setNotice(error);}} style={button(false)}>Remove from store</button>}
       </article>; })}
     </div>
     {!found.length && <p>No matching products. Try a different search or category.</p>}
