@@ -3,10 +3,6 @@
 -- Never expose service-role credentials or OTP hashes to browsers.
 create extension if not exists pgcrypto;
 
-alter table public.pickup_reservations
- add column if not exists pickup_code_hash text,
- add column if not exists pickup_code_attempts integer not null default 0;
-
 -- Keep the secret out of client-accessible SELECTs by moving it to a private table.
 create schema if not exists private;
 create table if not exists private.pickup_secrets (
@@ -33,7 +29,7 @@ begin
  -- Limit code rotation to avoid abuse.
  if exists(select 1 from private.pickup_secrets where reservation_id=v.id and (attempts>=5 or created_at>now()-interval '30 seconds'))
  then raise exception 'Pickup code locked; contact the shop'; end if;
- code:=lpad((floor(random()*1000000))::integer::text,6,'0');
+ code:=lpad(((get_byte(public.gen_random_bytes(4),0)::bigint*16777216 + get_byte(public.gen_random_bytes(4),1)::bigint*65536 + get_byte(public.gen_random_bytes(4),2)::bigint*256 + get_byte(public.gen_random_bytes(4),3)::bigint) % 1000000)::text,6,'0');
  insert into private.pickup_secrets(reservation_id,code_hash,attempts)
  values(v.id,public.crypt(code,public.gen_salt('bf')),0)
  on conflict(reservation_id) do update set code_hash=excluded.code_hash,attempts=0,created_at=now();
