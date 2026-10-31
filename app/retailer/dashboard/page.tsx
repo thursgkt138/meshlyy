@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import catalog from "../../../meshlyy-master-catalog.json";
+import imageReferences from "../../../meshlyy-source-image-references.json";
 import { useRetailerStore } from "../catalog/use-retailer-store";
 
 type Product = {id:string;name:string;category:string;packSize:string|null;mrpReference:number|null};
 const products=catalog as Product[];
 const byId=new Map(products.map(p=>[p.id,p]));
+const sourceImages=imageReferences as Record<string,{url:string;source:string;packSize:string|null}>;
+const imageFor=(p:Product)=>sourceImages[p.name.toLowerCase().replace(/[^a-z0-9]+/g," ").trim()]?.url||null;
 const currency=(n:number)=>"₹"+n.toLocaleString("en-IN",{maximumFractionDigits:2});
 const field:React.CSSProperties={border:"1px solid #c8dcd4",borderRadius:10,padding:"11px 12px",background:"#fff",color:"#143e38",width:"100%",boxSizing:"border-box"};
 const button:React.CSSProperties={background:"#143e38",color:"white",border:0,borderRadius:10,padding:"12px 18px",cursor:"pointer",fontWeight:700};
@@ -68,15 +71,23 @@ export default function RetailerDashboard(){
           <select aria-label="Stock filter" value={filter} onChange={e=>setFilter(e.target.value)} style={{...field,width:"auto"}}><option value="all">All products</option><option value="active">Available</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
         </div>
         {notice&&<p role="status" style={{color:"#126b5a"}}>{notice}</p>}
-        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",textAlign:"left",minWidth:570}}>
-          <thead><tr>{["Product","Price","Quantity","Status","Action"].map(h=><th key={h} style={{padding:"12px 8px",borderBottom:"1px solid #d8e6df",fontSize:12,color:"#648077"}}>{h}</th>)}</tr></thead>
-          <tbody>{rows.map(i=>{const p=byId.get(i.productId);return <tr key={i.productId}>
-            <td style={cell}><strong>{p?.name||i.productId}</strong><div style={{fontSize:12,color:"#668077",marginTop:5}}>{[p?.category,p?.packSize].filter(Boolean).join(" · ")}</div></td>
-            <td style={cell}>{currency(i.price)}</td><td style={cell}>{i.stock}</td>
-            <td style={cell}>{i.stock===0?"Out of stock":i.active?(i.stock<=5?"Low stock":"Available"):"Inactive"}</td>
-            <td style={cell}><button onClick={()=>startEdit(i)} style={{...button,padding:"8px 12px"}}>Edit</button></td>
-          </tr>;})}</tbody>
-        </table></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,225px),1fr))",gap:18}}>
+          {rows.map(i=>{const p=byId.get(i.productId);const image=p?imageFor(p):null;const status=i.stock===0?"Out of stock":!i.active?"Inactive":i.stock<=5?"Low stock":"Available";return <article key={i.productId} style={{border:"1px solid #dce9e2",borderRadius:20,background:"#fff",padding:14,display:"flex",flexDirection:"column",minWidth:0,boxShadow:"0 4px 16px rgba(17,60,51,.035)"}}>
+            <div style={{height:215,background:"#eef5f0",borderRadius:14,display:"grid",placeItems:"center",overflow:"hidden",position:"relative"}}>
+              {image?<img src={image} alt={p?.name||"Product"} loading="lazy" referrerPolicy="no-referrer" style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",padding:14,boxSizing:"border-box"}}/>:<span style={{fontSize:13,color:"#64887b"}}>Image unavailable</span>}
+              <span style={{position:"absolute",top:10,left:10,padding:"6px 9px",borderRadius:20,fontSize:11,fontWeight:700,background:i.stock===0?"#fff0ec":i.stock<=5?"#fff3d9":"#e4f4eb",color:i.stock===0?"#a33e2d":i.stock<=5?"#90620a":"#14634d"}}>{status}</span>
+            </div>
+            <div style={{padding:"14px 3px 0",display:"flex",flexDirection:"column",flex:1}}>
+              <span style={{fontSize:12,color:"#548277",marginBottom:7}}>{p?.category||"Catalogue product"}{p?.packSize?" · "+p.packSize:""}</span>
+              <h3 style={{fontSize:16,lineHeight:1.4,margin:"0 0 14px",minHeight:44}}>{p?.name||i.productId}</h3>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:8,marginTop:"auto",paddingBottom:15}}>
+                <div><div style={{fontSize:11,color:"#65877e"}}>Your price</div><strong style={{fontSize:23}}>{currency(i.price)}</strong></div>
+                <div style={{textAlign:"right"}}><div style={{fontSize:11,color:"#65877e"}}>In stock</div><strong style={{fontSize:19}}>{i.stock}</strong></div>
+              </div>
+              <button onClick={()=>startEdit(i)} style={{...button,width:"100%",padding:"12px 14px"}}>Edit price & stock</button>
+            </div>
+          </article>;})}
+        </div>
         {!rows.length&&<p style={{color:"#6b827b"}}>{r.items.length?"No products match these filters.":"Your shop has no products yet. Add products from the master catalogue."}</p>}
       </section>
       <section style={{...panel,marginTop:18}}>
@@ -97,4 +108,4 @@ export default function RetailerDashboard(){
   </main>;
 }
 const panel:React.CSSProperties={background:"white",border:"1px solid #d9e7df",borderRadius:18,padding:22};
-const cell:React.CSSProperties={padding:"15px 8px",borderBottom:"1px solid #e7eee9",fontSize:14};
+
