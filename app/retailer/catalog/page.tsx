@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import catalog from "../../meshlyy-master-catalog.json";
+import catalog from "../../../meshlyy-master-catalog.json";
+import imageReferences from "../../../meshlyy-source-image-references.json";
 
 type Product = { id: string; name: string; brand: string | null; packSize: string | null; category: string; mrpReference: number | null; imageUrl: string | null; imageStatus: string };
 type InventoryItem = { productId: string; price: number; stock: number; active: boolean };
 const products = catalog as Product[];
+const sourceImages = imageReferences as Record<string, { url: string; source: string; packSize: string | null }>;
+const imageFor = (p: Product) => sourceImages[p.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()]?.url || null;
 const KEY = "meshlyy-retailer-inventory-demo-v1";
 const money = (n: number | null) => n == null ? "—" : "₹" + n.toLocaleString("en-IN");
 
@@ -38,10 +41,10 @@ export default function RetailerCatalogPage() {
       <input aria-label="Search products" placeholder="Search milk, Amul, 500 ml…" value={query} onChange={e=>setQuery(e.target.value)} style={{...field,flex:"1 1 260px"}} />
       <select aria-label="Filter category" value={category} onChange={e=>setCategory(e.target.value)} style={{...field,flex:"0 1 240px"}}>{categories.map(c=><option key={c}>{c}</option>)}</select>
     </div>
-    <p style={{fontSize:13,color:"#647a76"}}>Showing {found.length} matches (up to 100). Catalogue reference MRP is not your selling price. Product images require licensed assets.</p>
+    <p style={{fontSize:13,color:"#647a76"}}>Showing {found.length} matches (up to 100). Catalogue reference MRP is not your selling price. Source image previews are for internal matching only; publication requires image rights.</p>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(235px,1fr))",gap:14,marginTop:20}}>
       {found.map(p=>{ const item=inventory.find(i=>i.productId===p.id); return <article key={p.id} style={{background:"white",border:"1px solid #dce8e2",borderRadius:18,padding:20,display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{height:85,background:"#edf5ef",borderRadius:12,display:"grid",placeItems:"center",color:"#6c9286",fontSize:12}}>Image pending licensing</div>
+        <div style={{height:115,background:"#edf5ef",borderRadius:12,display:"grid",placeItems:"center",color:"#6c9286",fontSize:12,overflow:"hidden"}}>{imageFor(p) ? <img src={imageFor(p)!} alt={p.name} loading="lazy" referrerPolicy="no-referrer" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}} /> : "Image not available"}</div>
         <span style={{fontSize:11,color:"#538477"}}>{p.category}</span>
         <strong style={{minHeight:42,lineHeight:1.35}}>{p.name}</strong>
         <span style={{fontSize:13,color:"#668078"}}>{[p.brand,p.packSize].filter(Boolean).join(" · ") || "Pack details unavailable"}</span>
