@@ -21,6 +21,8 @@ export default function RetailerOrders(){
  const [error,setError]=useState("");
  const [now,setNow]=useState(Date.now());
  const [tab,setTab]=useState<"active"|"history">("active");
+ const [statusFilter,setStatusFilter]=useState("active");
+ useEffect(()=>{const status=new URLSearchParams(window.location.search).get("status");if(status&&["all","requested","accepted","completed","rejected","expired"].includes(status)){setStatusFilter(status);setTab(status==="requested"||status==="accepted"?"active":"history");}},[]);
  const [codes,setCodes]=useState<Record<string,string>>({});
  const [codeErrors,setCodeErrors]=useState<Record<string,string>>({});
  const refresh=useCallback(async()=>{
@@ -60,7 +62,7 @@ export default function RetailerOrders(){
    else{setCodes(old=>({...old,[id]:""}));await refresh();}
    setBusy("");
  };
- const filtered=orders.filter(o=>tab==="active"?["requested","accepted"].includes(o.status):!["requested","accepted"].includes(o.status));
+ const filtered=orders.filter(o=>statusFilter==="all"?true:statusFilter==="active"?["requested","accepted"].includes(o.status):statusFilter==="history"?!["requested","accepted"].includes(o.status):o.status===statusFilter);
  return <main style={{background:"#f7faf7",minHeight:"100vh",color:"#102f30",fontFamily:"Arial,sans-serif",padding:"30px max(20px,calc((100vw - 1120px)/2))"}}>
    <nav style={{display:"flex",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}><Link href="/retailer/dashboard" style={{color:"#146858"}}>← Dashboard</Link><Link href="/retailer/catalog" style={{color:"#146858"}}>Master catalogue</Link></nav>
    <p style={{fontSize:12,letterSpacing:3,color:"#54877a",marginTop:38}}>MESHLYY / RETAILER STUDIO</p>
@@ -69,7 +71,8 @@ export default function RetailerOrders(){
    <div style={{...card,margin:"22px 0",background:"#edf6f0"}}><strong>Reservation system preview</strong><p style={{marginBottom:0,color:"#53776b"}}>Consumer pickup requests are now connected. Verified pickup completion and automated server-side expiry are still required before launch.</p></div>
    {store.loading?<p>Loading your shop…</p>:store.error?<p role="alert">{store.error}</p>:!store.user?<div style={card}>Please <Link href="/retailer/catalog">sign in</Link> to view your shop reservations.</div>:!store.storeId?<div style={card}>Please <Link href="/retailer/catalog">create your shop</Link> first.</div>:<>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:20}}><strong>{store.storeName}</strong><button style={btn} onClick={()=>void refresh()}>Refresh orders</button></div>
-     <div style={{display:"flex",gap:10,marginBottom:20}}><button style={{...btn,background:tab==="active"?"#143e38":"#e6f0e9",color:tab==="active"?"#fff":"#143e38"}} onClick={()=>setTab("active")}>Open requests ({orders.filter(o=>["requested","accepted"].includes(o.status)).length})</button><button style={{...btn,background:tab==="history"?"#143e38":"#e6f0e9",color:tab==="history"?"#fff":"#143e38"}} onClick={()=>setTab("history")}>History ({orders.filter(o=>!["requested","accepted"].includes(o.status)).length})</button></div>
+     <div style={{display:"flex",gap:10,marginBottom:20}}><button style={{...btn,background:tab==="active"?"#143e38":"#e6f0e9",color:tab==="active"?"#fff":"#143e38"}} onClick={()=>{setTab("active");setStatusFilter("active");}}>Open requests ({orders.filter(o=>["requested","accepted"].includes(o.status)).length})</button><button style={{...btn,background:tab==="history"?"#143e38":"#e6f0e9",color:tab==="history"?"#fff":"#143e38"}} onClick={()=>{setTab("history");setStatusFilter("history");}}>History ({orders.filter(o=>!["requested","accepted"].includes(o.status)).length})</button></div>
+     <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{(["all","requested","accepted","completed","rejected","expired"] as const).map(status=><button key={status} type="button" onClick={()=>{setStatusFilter(status);setTab(status==="requested"||status==="accepted"?"active":"history");}} style={{...btn,padding:"8px 12px",fontSize:12,background:statusFilter===status?"#143e38":"#e6f0e9",color:statusFilter===status?"white":"#143e38",textTransform:"capitalize"}}>{status==="all"?"All orders":status} ({status==="all"?orders.length:orders.filter(o=>o.status===status).length})</button>)}</div>
      {error&&<p role="alert" style={{color:"#b33b31"}}>{error}</p>}
      <div style={{display:"grid",gap:18}}>{filtered.map(o=>{
        const lines=items.filter(i=>i.reservation_id===o.id);
