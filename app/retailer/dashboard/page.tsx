@@ -24,7 +24,9 @@ export default function RetailerDashboard(){
   const [notice,setNotice]=useState("");
   const [saving,setSaving]=useState(false);
   const [posSales,setPosSales]=useState<{total:number;created_at:string}[]>([]);
-  const [pickup,setPickup]=useState<{status:string}[]>([]);
+  const [pickup,setPickup]=useState<{id:string;status:string;requested_at:string;expires_at:string|null}[]>([]);
+  const [orderBusy,setOrderBusy]=useState<string|null>(null);
+  const [orderNotice,setOrderNotice]=useState("");
   const [metricsError,setMetricsError]=useState("");
   const [recentSales,setRecentSales]=useState<{total:number;created_at:string}[]>([]);
   const [searchDemand,setSearchDemand]=useState<{search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]>([]);
@@ -41,14 +43,14 @@ export default function RetailerDashboard(){
       const start=new Date();start.setHours(0,0,0,0);
       const [sales,orders,recent]=await Promise.all([
         client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",start.toISOString()).limit(1000),
-        client.from("pickup_reservations").select("status").eq("store_id",r.storeId).in("status",["requested","accepted"]).limit(100),
+        client.from("pickup_reservations").select("id,status,requested_at,expires_at").eq("store_id",r.storeId).in("status",["requested","accepted"]).order("requested_at",{ascending:false}).limit(100),
         client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",new Date(Date.now()-7*86400000).toISOString()).order("created_at",{ascending:false}).limit(1000)
       ]);
       if(!active)return;
       setMetricsError([sales.error?.message,orders.error?.message].filter(Boolean).join(" · "));
       if(!sales.error)setPosSales((sales.data||[]) as {total:number;created_at:string}[]);
       if(!recent.error)setRecentSales((recent.data||[]) as {total:number;created_at:string}[]);
-      if(!orders.error)setPickup((orders.data||[]) as {status:string}[]);
+      if(!orders.error)setPickup((orders.data||[]) as {id:string;status:string;requested_at:string;expires_at:string|null}[]);
       setMetricsLoading(false);
     };
     const loadDemand=async()=>{const result=await client.rpc("get_store_search_demand",{p_store_id:r.storeId,p_days:30});if(!active)return;if(result.error)setSearchDemandError(result.error.message);else{setSearchDemandError("");setSearchDemand((result.data||[]) as {search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]);}};
@@ -64,6 +66,21 @@ export default function RetailerDashboard(){
     const timer=setInterval(()=>{void load();void loadFunnel();},30000);
     return()=>{active=false;clearInterval(timer);};
   },[r.storeId]);
+  const decidePickup=async(id:string,action:"accept"|"reject")=>{
+    if(!supabase||orderBusy)return;
+    if(!window.confirm(action==="accept"?"Accept this request and reserve stock?":"Reject this pickup request?"))return;
+    setOrderBusy(id);setOrderNotice("");
+    const result=await supabase.rpc("retailer_reservation_action",{p_reservation_id:id,p_action:action});
+    if(result.error)setOrderNotice(result.error.message);
+    else{
+      setOrderNotice(action==="accept"?"Pickup accepted. Ask the customer to collect within the pickup window.":"Pickup rejected.");
+      if(r.storeId){
+        const refreshed=await supabase.from("pickup_reservations").select("id,status,requested_at,expires_at").eq("store_id",r.storeId).in("status",["requested","accepted"]).order("requested_at",{ascending:false}).limit(100);
+        if(!refreshed.error)setPickup((refreshed.data||[]) as {id:string;status:string;requested_at:string;expires_at:string|null}[]);
+      }
+    }
+    setOrderBusy(null);
+  };
   const stats=useMemo(()=>({
     total:r.items.length,
     active:r.items.filter(i=>i.active&&i.stock>0).length,
@@ -118,6 +135,25 @@ export default function RetailerDashboard(){
         ] as [string,string|number,string][]).map(([label,value,href])=><Link key={label} href={href} style={{...panel,textDecoration:"none",color:"#102f30",display:"block",cursor:"pointer",transition:"transform .15s,box-shadow .15s"}} title={"Open "+label.toLowerCase()}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong><p style={{fontSize:12,color:"#116d5a",marginBottom:0}}>View details →</p></Link>)}
         </div>
         <p style={{fontSize:12,color:"#668277"}}>Updates every 30 seconds. POS revenue excludes pickup orders. Counts are limited to the most recent 1,000 POS sales and 100 open pickup orders.</p>
+      </section>
+      <section style={{...panel,marginBottom:20,borderColor:pickup.some(o=>o.status==="requested")?"#c9dfce":"#dce9e2"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+          <div><p style={{fontSize:11,letterSpacing:2,color:"#397e67",fontWeight:700,margin:"0 0 6px"}}>LIVE ORDER INBOX</p><h2 style={{margin:0}}>Pickup requests <span style={{fontSize:16,color:"#5e8177"}}>({pickup.filter(o=>o.status==="requested").length} new)</span></h2></div>
+          <Link href="/retailer/orders?status=all" style={{...button,textDecoration:"none",background:"#e5f1ea",color:"#143e38"}}>All orders →</Link>
+        </div>
+        <p style={{fontSize:13,color:"#648378"}}>Act on new requests here. Open an accepted order to verify its pickup code.</p>
+        {orderNotice&&<p role="status" style={{fontSize:13,color:"#9a572a"}}>{orderNotice}</p>}
+        <div style={{display:"grid",gap:9}}>
+          {pickup.slice(0,5).map(o=><div key={o.id} style={{background:"#f5f9f6",padding:"12px 14px",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div><strong>#{o.id.slice(0,8).toUpperCase()}</strong><p style={{fontSize:12,color:"#648378",margin:"5px 0 0"}}>{new Date(o.requested_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})} · {o.status==="requested"?"Needs your decision":"Ready for collection"}</p></div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {o.status==="requested"&&<><button type="button" disabled={orderBusy!==null} onClick={()=>void decidePickup(o.id,"accept")} style={{...button,padding:"9px 13px",opacity:orderBusy!==null?.6:1}}>Accept</button><button type="button" disabled={orderBusy!==null} onClick={()=>void decidePickup(o.id,"reject")} style={{...button,padding:"9px 13px",background:"#f1e7e5",color:"#934f43"}}>Reject</button></>}
+              <Link href={"/retailer/orders?status="+o.status} style={{...button,textDecoration:"none",padding:"9px 13px",background:"#e2eee7",color:"#143e38"}}>{o.status==="accepted"?"Verify pickup":"View details"} →</Link>
+            </div>
+          </div>)}
+          {!pickup.length&&<p style={{fontSize:13,color:"#648378",margin:0}}>No open pickup requests. New orders will appear here automatically.</p>}
+        </div>
+        {pickup.length>5&&<p style={{fontSize:12,color:"#648378"}}>Showing the 5 most recent open requests. <Link href="/retailer/orders?status=all">View all</Link></p>}
       </section>
       <section style={{...panel,marginBottom:20}}>
         <h2 style={{marginTop:0}}>Operations hub</h2>
