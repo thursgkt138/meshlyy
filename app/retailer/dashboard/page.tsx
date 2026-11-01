@@ -51,7 +51,7 @@ export default function RetailerDashboard(){
   return <main style={{minHeight:"100vh",background:"#f7faf7",color:"#102f30",padding:"28px max(20px,calc((100vw - 1150px)/2))",fontFamily:"Arial,sans-serif"}}>
     <nav style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <Link href="/" style={{color:"#126c5b",textDecoration:"none",fontWeight:700}}>◈ meshlyy</Link>
-      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}><Link href="/retailer/pos" style={{color:"#126c5b",fontWeight:700}}>Open POS →</Link><Link href="/retailer/orders" style={{color:"#126c5b"}}>Pickup orders</Link><Link href="/retailer/catalog" style={{color:"#126c5b"}}>Master catalogue →</Link></div>
+      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}><Link href="/retailer/pos" style={{color:"#126c5b",fontWeight:700}}>Open POS →</Link><Link href="/retailer/sales" style={{color:"#126c5b"}}>Sales & receipts</Link><Link href="/retailer/stock" style={{color:"#126c5b"}}>Stock adjustments</Link><Link href="/retailer/orders" style={{color:"#126c5b"}}>Pickup orders</Link><Link href="/retailer/catalog" style={{color:"#126c5b"}}>Master catalogue →</Link></div>
     </nav>
     <p style={{letterSpacing:3,fontSize:12,color:"#477b70",marginTop:38}}>RETAILER STUDIO / DASHBOARD</p>
     <h1 style={{fontSize:"clamp(30px,5vw,50px)",margin:"8px 0 10px"}}>Your shop, at a glance.</h1>
