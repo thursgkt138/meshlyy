@@ -6,7 +6,7 @@ import {supabase} from "../catalog/use-retailer-store";
 export default function RetailerAccess(){
  const router=useRouter();
  const [mode,setMode]=useState<"login"|"signup">("login");
- const [method,setMethod]=useState<"phone"|"email">("phone");
+ const [method,setMethod]=useState<"phone"|"email">("email");
  const [phone,setPhone]=useState("");const [otp,setOtp]=useState("");const [otpSent,setOtpSent]=useState(false);
  const [email,setEmail]=useState("");const [password,setPassword]=useState("");
  const [busy,setBusy]=useState(false);const [notice,setNotice]=useState("");const [ready,setReady]=useState(false);
@@ -26,7 +26,7 @@ export default function RetailerAccess(){
  <section style={{background:"white",padding:"clamp(24px,5vw,44px)",borderRadius:24,border:"1px solid #e0eae3",maxWidth:440,width:"100%",boxSizing:"border-box",boxShadow:"0 20px 65px #143e3810"}}>
  <Link href="/" style={{textDecoration:"none",color:"#143e38",fontSize:22,fontWeight:800}}>◈ meshlyy</Link><p style={{fontSize:12,letterSpacing:2,color:"#6b8a7c"}}>RETAILER STUDIO</p>
  <h1 style={{fontSize:30,margin:"20px 0 8px"}}>{mode==="signup"?"Create retailer account":"Welcome back"}</h1><p style={{color:"#678276",lineHeight:1.6}}>Manage your neighbourhood store from one workspace.</p>
- <div style={{display:"flex",gap:8,marginTop:22}}><button type="button" onClick={()=>setMethod("phone")} style={{padding:10,flex:1,borderRadius:10,border:"1px solid #cadbd2",background:method==="phone"?"#dff0e5":"white",fontWeight:700}}>Mobile OTP</button><button type="button" onClick={()=>setMethod("email")} style={{padding:10,flex:1,borderRadius:10,border:"1px solid #cadbd2",background:method==="email"?"#dff0e5":"white",fontWeight:700}}>Email</button></div>
+ <p style={{fontSize:13,color:"#678276",marginTop:20}}>Continue using your email address. Mobile OTP sign-in is coming later.</p>
  {method==="phone"?<div style={{display:"grid",gap:14,marginTop:18}}><label style={{fontWeight:600,fontSize:13}}>Mobile number (+91)<input type="tel" inputMode="numeric" maxLength={10} value={phone} disabled={otpSent} onChange={e=>setPhone(e.target.value.replace(/\\D/g,""))} placeholder="10-digit mobile number" style={{...field,marginTop:7}}/></label>
  {otpSent&&<label style={{fontWeight:600,fontSize:13}}>6-digit OTP<input inputMode="numeric" maxLength={6} value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,""))} placeholder="Enter OTP" style={{...field,marginTop:7}}/></label>}
  <button type="button" disabled={busy} onClick={()=>void (otpSent?verifyOtp():sendOtp())} style={{background:"#143e38",color:"white",padding:15,border:0,borderRadius:11,fontWeight:700}}>{busy?"Please wait…":otpSent?"Verify & continue →":"Send OTP →"}</button>
