@@ -18,6 +18,11 @@ export default function RetailerDashboard(){
   const r=useRetailerStore();
   const [query,setQuery]=useState("");
   const [showInventory,setShowInventory]=useState(false);
+  const [storeOpen,setStoreOpen]=useState(false);
+  const [storeToggleBusy,setStoreToggleBusy]=useState(false);
+  const [storeToggleError,setStoreToggleError]=useState("");
+  useEffect(()=>{if(!supabase||!r.storeId)return;let alive=true;supabase.from("retailer_stores").select("is_open").eq("id",r.storeId).single().then(({data,error})=>{if(alive){if(error)setStoreToggleError(error.message);else setStoreOpen(Boolean(data?.is_open));}});return()=>{alive=false;};},[r.storeId]);
+  const toggleStore=async()=>{if(!supabase||!r.storeId||storeToggleBusy)return;setStoreToggleBusy(true);setStoreToggleError("");const {data,error}=await supabase.rpc("set_retailer_store_open",{p_store_id:r.storeId,p_is_open:!storeOpen});if(error)setStoreToggleError(error.message);else setStoreOpen(Boolean(data));setStoreToggleBusy(false);};
   const [filter,setFilter]=useState("all");
   const [editing,setEditing]=useState<string|null>(null);
   const [price,setPrice]=useState("");
@@ -151,11 +156,13 @@ export default function RetailerDashboard(){
     {r.loading?<p>Loading your store…</p>:r.error?<p role="alert" style={{color:"#a33b30"}}>{r.error}</p>:!r.user?<section style={panel}><h2>Sign in to continue</h2><p>Use the retailer account you created in the catalogue.</p><Link href="/retailer/login">Sign in →</Link> · <Link href="/retailer/signup">Create account →</Link></section>:!r.storeId?<section style={panel}><h2>Set up your shop</h2><p>Create your store from the retailer catalogue first.</p><Link href="/retailer/catalog">Create my shop →</Link></section>:<>
       <section style={{...panel,marginTop:14,padding:"15px 19px",background:"#143e38",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div><small style={{color:"#b7d9c9",letterSpacing:1}}>ACTIVE STORE</small><strong style={{fontSize:20,display:"block",marginTop:3}}>{r.storeName}</strong></div>
-        <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
+          <button type="button" role="switch" aria-checked={storeOpen} disabled={storeToggleBusy} onClick={()=>void toggleStore()} style={{...button,padding:"11px 14px",background:storeOpen?"#d6f2df":"#f7e7dd",color:storeOpen?"#143e38":"#873f2e"}}>{storeToggleBusy?"Updating…":storeOpen?"● Shop Open · Turn off":"○ Shop Closed · Turn on"}</button>
           <Link href="/retailer/pos" style={{...button,textDecoration:"none",background:"#d6f2df",color:"#143e38",padding:"11px 14px"}}>+ New sale</Link>
           <Link href="/retailer/catalog" style={{...button,textDecoration:"none",background:"#ffffff20",padding:"11px 14px"}}>+ Add product</Link>
         </div>
       </section>
+      {storeToggleError&&<p role="alert" style={{color:"#a33b30"}}>{storeToggleError}</p>}
       <section aria-label="Business pulse" style={{margin:"14px 0"}}>
         <h2 style={{fontSize:20,margin:"0 0 12px"}}>Today at a glance</h2>
         {metricsError&&<p role="alert" style={{color:"#a33b30"}}>{metricsError}</p>}
