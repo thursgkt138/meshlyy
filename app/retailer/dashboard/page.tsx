@@ -214,6 +214,25 @@ export default function RetailerDashboard(){
           <Link href="/retailer/sales" style={{display:"inline-block",marginTop:24,color:"#146653",fontWeight:700}}>Explore transactions →</Link>
         </div>
       </section>
+      <section style={{...panel,marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <div><p style={{fontSize:11,letterSpacing:2,color:"#548478",fontWeight:700}}>STOCK HEALTH</p><h2 style={{margin:"6px 0"}}>Inventory at a glance</h2></div>
+          <Link href="/retailer/stock" style={{...button,textDecoration:"none"}}>Stock control →</Link>
+        </div>
+        <div style={{display:"flex",height:13,borderRadius:10,overflow:"hidden",background:"#e8eee9",margin:"16px 0 10px"}}>
+          <div title={"Available: "+stats.active} style={{width:(stats.total?100*stats.active/stats.total:0)+"%",background:"#3d9a76"}}/>
+          <div title={"Low stock: "+stats.low} style={{width:(stats.total?100*stats.low/stats.total:0)+"%",background:"#e5a653"}}/>
+          <div title={"Out of stock: "+stats.out} style={{width:(stats.total?100*stats.out/stats.total:0)+"%",background:"#d77b68"}}/>
+        </div>
+        <p style={{fontSize:12,color:"#648378"}}>{stats.active} available · {stats.low} low stock · {stats.out} out of stock. Low-stock items may also be counted as available.</p>
+        <div style={{display:"grid",gap:8}}>
+          {r.items.filter(i=>i.active&&i.stock<=5).sort((a,b)=>a.stock-b.stock).slice(0,6).map(i=><div key={i.productId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",padding:"11px 13px",border:"1px solid #e3ece6",borderRadius:12}}>
+            <div><strong style={{fontSize:13}}>{byId.get(i.productId)?.name||i.productId}</strong><p style={{fontSize:12,color:i.stock===0?"#b4513d":"#986b25",margin:"5px 0 0"}}>{i.stock===0?"Out of stock":i.stock+" left"}</p></div>
+            <Link href={"/retailer/stock?product="+encodeURIComponent(i.productId)} style={{...button,textDecoration:"none",padding:"9px 12px",background:"#e5f1ea",color:"#143e38"}}>Restock →</Link>
+          </div>)}
+          {!r.items.some(i=>i.active&&i.stock<=5)&&<p style={{fontSize:13,color:"#648378"}}>No active products are below the 5-unit alert threshold.</p>}
+        </div>
+      </section>
       {topRisk.length>0&&<section style={{...panel,marginBottom:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><p style={{fontSize:12,letterSpacing:2,color:"#a36926"}}>RESTOCK PRIORITY</p><h2 style={{margin:"5px 0 14px"}}>Products to replenish</h2></div><Link href="/retailer/stock" style={{...button,textDecoration:"none"}}>Adjust stock →</Link></div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>{topRisk.map(i=><div key={i.productId} style={{background:"#f7f9f6",padding:14,borderRadius:13,border:"1px solid #e1eae3"}}><strong style={{fontSize:13}}>{byId.get(i.productId)?.name||i.productId}</strong><p style={{color:i.stock===0?"#b44b36":"#9c6b21",fontWeight:700,margin:"9px 0 0"}}>{i.stock} units left</p></div>)}</div>
