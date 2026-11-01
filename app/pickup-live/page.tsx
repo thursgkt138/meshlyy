@@ -27,6 +27,7 @@ export default function LivePickup(){
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const [now,setNow]=useState(Date.now());
  const lastTrackedSearch=useRef("");
+ const [viewed,setViewed]=useState<string|null>(null);
  const load=useCallback(async()=>{
    if(!supabase){setMessage("Supabase configuration is missing.");setLoading(false);return;}
    const {data,error}=await supabase.rpc("discover_pickup_products",{p_query:"",p_locality:locality.trim(),p_limit:100});
@@ -96,7 +97,8 @@ export default function LivePickup(){
  const stores=useMemo(()=>new Map(listings.map(l=>[l.store_id,l.store_name])),[listings]);
  const selected=Object.entries(basket).filter(([,q])=>q>0).map(([key,q])=>{const l=listings.find(x=>x.store_id+":"+x.product_id===key);return l?{...l,quantity:q}:null;}).filter((x):x is Listing&{quantity:number}=>!!x);
  const groups=Array.from(new Set(selected.map(x=>x.store_id))).map(id=>({id,name:stores.get(id)||"Shop",lines:selected.filter(x=>x.store_id===id)}));
- const change=(l:Listing,delta:number)=>{const key=l.store_id+":"+l.product_id;setBasket(old=>{const next={...old};const q=Math.min(l.stock,Math.max(0,(old[key]||0)+delta));if(q)next[key]=q;else delete next[key];return next;});};
+ const track=(l:Listing,eventType:"view"|"basket_add"|"pickup_requested")=>{if(!supabase||!user)return;void supabase.rpc("record_consumer_product_event",{p_store_id:l.store_id,p_product_id:l.product_id,p_event_type:eventType,p_locality:l.locality}).then(({error})=>{if(error)console.warn("Product analytics unavailable:",error.message);});};
+ const change=(l:Listing,delta:number)=>{if(delta>0)track(l,"basket_add");const key=l.store_id+":"+l.product_id;setBasket(old=>{const next={...old};const q=Math.min(l.stock,Math.max(0,(old[key]||0)+delta));if(q)next[key]=q;else delete next[key];return next;});};
  const login=async()=>{if(!supabase)return;setBusy(true);setMessage("");const r=register?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setBusy(false);setMessage(r.error?.message||(!r.data.session?"Check your email to confirm your account.":"Signed in."));};
  const generateCode=async(id:string)=>{
    if(!supabase)return;
@@ -114,6 +116,7 @@ export default function LivePickup(){
    setBusy(false);
    if(r.error){setMessage(r.error.message);return;}
    setMessage("Pickup request sent to "+group.name+". Wait for retailer acceptance before visiting.");
+   for(const item of group.lines)track(item,"pickup_requested");
    setBasket(old=>{const next={...old};for(const x of group.lines)delete next[x.store_id+":"+x.product_id];return next;});
    await loadOrders();await load();
  };
@@ -132,11 +135,13 @@ export default function LivePickup(){
   {loading?<p>Loading inventory…</p>:!filtered.length?<p>No matching in-stock products. Try another locality or search.</p>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,225px),1fr))",gap:16}}>
     {filtered.map(l=>{const p=products.get(l.product_id);const image=imageFor(p);const qty=basket[l.store_id+":"+l.product_id]||0;return <article key={l.store_id+":"+l.product_id} style={{border:"1px solid #dce9e2",borderRadius:20,padding:14,background:"white",display:"flex",flexDirection:"column",minWidth:0,overflow:"hidden",gap:0}}>
       <div style={{height:210,width:"100%",background:"#eef5f0",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,position:"relative"}}>{image?<img src={image} alt={p?.name||"Product"} referrerPolicy="no-referrer" loading="lazy" style={{display:"block",width:"100%",height:"100%",maxWidth:"100%",maxHeight:"100%",objectFit:"contain",objectPosition:"center",padding:12,boxSizing:"border-box",flex:"none"}}/>:<span style={{fontSize:12,color:"#6d8d80"}}>Image unavailable</span>}</div>
+      <button type="button" onClick={()=>{setViewed(l.store_id+":"+l.product_id);track(l,"view");}} style={{border:0,background:"transparent",padding:0,textAlign:"left",color:"#286b5a",fontSize:12,cursor:"pointer",marginTop:12}}>View product details</button>
       <p style={{fontSize:12,color:"#387a68",margin:"12px 0 6px",overflowWrap:"anywhere"}}>{l.store_name} · {l.locality||"Local shop"}</p><strong style={{lineHeight:1.4,minHeight:0,overflowWrap:"anywhere"}}>{p?.name||l.product_id}</strong><p style={{fontSize:12,color:"#66857b",margin:"7px 0 4px"}}>{p?.packSize||p?.category||""}</p>
       <div style={{display:"flex",justifyContent:"space-between",marginTop:"10px",alignItems:"center",padding:"10px 0 14px"}}><strong style={{fontSize:22}}>{money(l.price)}</strong><span style={{fontSize:12,color:"#658477"}}>{l.stock} available</span></div>
       {qty?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={button} onClick={()=>change(l,-1)}>−</button><strong>{qty}</strong><button style={button} onClick={()=>change(l,1)}>+</button></div>:<button style={button} onClick={()=>change(l,1)}>+ Add to basket</button>}
     </article>;})}
   </div>}
+  {viewed&&(()=>{const listing=listings.find(l=>l.store_id+":"+l.product_id===viewed);if(!listing)return null;const p=products.get(listing.product_id);return <div role="dialog" aria-modal="true" aria-label="Product details" style={{position:"fixed",inset:0,zIndex:100,background:"rgba(16,43,37,.75)",display:"grid",placeItems:"center",padding:20}}><section style={{background:"white",padding:25,borderRadius:20,maxWidth:440,width:"100%"}}><button onClick={()=>setViewed(null)} style={{float:"right",border:0,background:"transparent",cursor:"pointer"}} aria-label="Close details">Close</button><h2 style={{marginTop:8}}>{p?.name||listing.product_id}</h2><p>{p?.category} · {p?.packSize}</p><p>{listing.store_name} · {listing.locality||"Local shop"}</p><strong style={{fontSize:24}}>{money(listing.price)}</strong><p>{listing.stock} units available</p><button style={button} onClick={()=>{change(listing,1);setViewed(null);}}>Add to pickup basket</button></section></div>;})()}
   <section id="pickup-baskets" style={{marginTop:48,scrollMarginTop:30}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",gap:16,flexWrap:"wrap",marginBottom:22}}>
       <div><p style={{letterSpacing:2,fontSize:11,fontWeight:700,color:"#41806e",margin:"0 0 8px"}}>YOUR NEIGHBOURHOOD ORDER</p><h2 style={{fontSize:"clamp(28px,3vw,38px)",margin:"0 0 8px"}}>Your pickup baskets <span style={{fontSize:17,fontWeight:400,color:"#729087"}}>({selected.reduce((n,x)=>n+x.quantity,0)} items)</span></h2><p style={{color:"#66847a",fontSize:14,margin:0}}>One pickup request per shop. You only visit after the shop accepts.</p></div>
