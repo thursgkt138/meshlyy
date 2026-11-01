@@ -27,6 +27,8 @@ export default function RetailerDashboard(){
   const [pickup,setPickup]=useState<{status:string}[]>([]);
   const [metricsError,setMetricsError]=useState("");
   const [recentSales,setRecentSales]=useState<{total:number;created_at:string}[]>([]);
+  const [searchDemand,setSearchDemand]=useState<{search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]>([]);
+  const [searchDemandError,setSearchDemandError]=useState("");
   const [metricsLoading,setMetricsLoading]=useState(true);
   useEffect(()=>{
     if(!supabase||!r.storeId){setMetricsLoading(false);return;}
@@ -45,7 +47,8 @@ export default function RetailerDashboard(){
       if(!orders.error)setPickup((orders.data||[]) as {status:string}[]);
       setMetricsLoading(false);
     };
-    void load();const timer=setInterval(()=>void load(),30000);
+    const loadDemand=async()=>{const result=await client.rpc("get_store_search_demand",{p_store_id:r.storeId,p_days:30});if(!active)return;if(result.error)setSearchDemandError(result.error.message);else{setSearchDemandError("");setSearchDemand((result.data||[]) as {search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]);}};
+    void load();void loadDemand();const timer=setInterval(()=>void load(),30000);
     return()=>{active=false;clearInterval(timer);};
   },[r.storeId]);
   const stats=useMemo(()=>({
@@ -119,7 +122,7 @@ export default function RetailerDashboard(){
           <div style={{display:"grid",gap:10,marginTop:20}}>
             <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>Today's average bill · {currency(avgTicket)}</strong><p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>{posSales.length?posSales.length+" recorded POS transactions today.":"Record POS sales to start tracking basket value."}</p></div>
             <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>{stats.out+stats.low} products need attention</strong><p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>{stats.out} out of stock · {stats.low} running low. Prioritise restocking active products.</p></div>
-            <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>Consumer search demand</strong><p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>Not available yet. Search-event tracking must be enabled before demand insights can be calculated.</p></div>
+            <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>Consumer search demand · last 30 days</strong>{searchDemandError?<p style={{fontSize:13,color:"#f9d9c7"}}>Analytics unavailable: {searchDemandError}</p>:searchDemand.length?<div style={{marginTop:8}}>{searchDemand.slice(0,5).map(x=><p key={x.search_term} style={{fontSize:13,color:"#c4ddd4",margin:"7px 0"}}>{x.search_term} · {x.searches} searches{x.zero_result_searches>0?" · "+x.zero_result_searches+" no-match":""}</p>)}</div>:<p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>No trends to show yet. Each term needs at least five distinct signed-in consumers.</p>}<p style={{fontSize:11,color:"#b0cfc2",marginBottom:0}}>Platform-wide searches, not neighbourhood-specific. Match counts use the first 100 loaded listings.</p></div>
           </div>
         </div>
         <div style={{...panel,padding:26}}>
