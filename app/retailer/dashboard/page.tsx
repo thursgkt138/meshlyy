@@ -301,7 +301,7 @@ export default function RetailerDashboard(){
         </div>
         {!rows.length&&<p style={{color:"#6b827b"}}>{r.items.length?"No products match these filters.":"Your shop has no products yet. Add products from the master catalogue."}</p>}
       </section>
-      </>
+      </>}
       <section style={{...panel,marginTop:18}}>
         <h2 style={{marginTop:0}}>Pickup reservations</h2>
         <p style={{color:"#617c74"}}>Pickup requests and verified collections are managed from the live orders page.</p>
