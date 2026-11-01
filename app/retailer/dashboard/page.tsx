@@ -30,6 +30,8 @@ export default function RetailerDashboard(){
   const [metricsError,setMetricsError]=useState("");
   const [recentSales,setRecentSales]=useState<{total:number;created_at:string}[]>([]);
   const [salesRange,setSalesRange]=useState<7|30>(7);
+  const [productSales,setProductSales]=useState<{product_id:string;quantity:number;unit_price:number}[]>([]);
+  const [productSalesError,setProductSalesError]=useState("");
   const [selectedDay,setSelectedDay]=useState<string|null>(null);
   const [searchDemand,setSearchDemand]=useState<{search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]>([]);
   const [searchDemandError,setSearchDemandError]=useState("");
@@ -64,6 +66,18 @@ export default function RetailerDashboard(){
       if(result.error)setFunnelError(result.error.message);
       else{setFunnelError("");setPickupFunnel((result.data||[]) as {status:string}[]);}
     };
+    const loadProductSales=async()=>{
+      const sales=await client.from("pos_sales").select("id").eq("store_id",r.storeId).gte("created_at",new Date(Date.now()-30*86400000).toISOString()).order("created_at",{ascending:false}).limit(200);
+      if(!active)return;
+      if(sales.error){setProductSalesError(sales.error.message);return;}
+      const ids=(sales.data||[]).map(s=>s.id);
+      if(!ids.length){setProductSales([]);setProductSalesError("");return;}
+      const lines=await client.from("pos_sale_items").select("product_id,quantity,unit_price").in("sale_id",ids).limit(2000);
+      if(!active)return;
+      if(lines.error)setProductSalesError(lines.error.message);
+      else{setProductSalesError("");setProductSales((lines.data||[]) as {product_id:string;quantity:number;unit_price:number}[]);}
+    };
+    void loadProductSales();
     void load();void loadDemand();void loadEngagement();void loadFunnel();
     const timer=setInterval(()=>{void load();void loadFunnel();},30000);
     return()=>{active=false;clearInterval(timer);};
@@ -99,6 +113,12 @@ export default function RetailerDashboard(){
   const maxDay=Math.max(1,...dailySales.map(d=>d.value));
   const selectedSalesDay=dailySales.find(d=>d.key===selectedDay);
   const rangeSales=dailySales.reduce((sum,d)=>sum+d.value,0);
+  const rankedProducts=Array.from(productSales.reduce((map,line)=>{
+    const old=map.get(line.product_id)||{productId:line.product_id,units:0,revenue:0};
+    old.units+=Number(line.quantity);old.revenue+=Number(line.quantity)*Number(line.unit_price);
+    map.set(line.product_id,old);return map;
+  },new Map<string,{productId:string;units:number;revenue:number}>()).values()).sort((a,b)=>b.revenue-a.revenue).slice(0,8);
+  const maxProductRevenue=Math.max(1,...rankedProducts.map(p=>p.revenue));
   const topRisk=r.items.filter(i=>i.active&&i.stock<=5).sort((a,b)=>a.stock-b.stock).slice(0,5);
   const avgTicket=posSales.length?posSales.reduce((sum,s)=>sum+Number(s.total),0)/posSales.length:0;
   const rows=r.items.filter(i=>{
@@ -212,6 +232,21 @@ export default function RetailerDashboard(){
           </div>
           <p style={{fontSize:13,color:"#486b60",minHeight:18}}>{selectedSalesDay?selectedSalesDay.label+": "+currency(selectedSalesDay.value)+" in POS sales":"Select a bar to see that day's revenue."}</p>
           <Link href="/retailer/sales" style={{display:"inline-block",marginTop:24,color:"#146653",fontWeight:700}}>Explore transactions →</Link>
+        </div>
+      </section>
+      <section style={{...panel,marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+          <div><p style={{fontSize:11,letterSpacing:2,color:"#548478",fontWeight:700}}>PRODUCT PERFORMANCE</p><h2 style={{margin:"6px 0"}}>Top-selling products</h2></div>
+          <Link href="/retailer/sales" style={{...button,textDecoration:"none"}}>Sales report →</Link>
+        </div>
+        <p style={{fontSize:12,color:"#648378"}}>POS items only, last 30 days. Based on the latest 200 POS transactions (up to 2,000 line items); pickup orders are excluded.</p>
+        {productSalesError&&<p role="alert" style={{color:"#a33b30"}}>{productSalesError}</p>}
+        <div style={{display:"grid",gap:13}}>
+          {rankedProducts.map(p=><div key={p.productId} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:12,alignItems:"center"}}>
+            <div style={{minWidth:0}}><strong style={{fontSize:13}}>{byId.get(p.productId)?.name||p.productId}</strong><div style={{height:8,background:"#e9f0e9",borderRadius:8,marginTop:8,overflow:"hidden"}}><div style={{width:(100*p.revenue/maxProductRevenue)+"%",height:"100%",background:"#438e74",borderRadius:8}}/></div></div>
+            <div style={{textAlign:"right"}}><strong>{currency(p.revenue)}</strong><div style={{fontSize:12,color:"#648378"}}>{p.units} units</div></div>
+          </div>)}
+          {!rankedProducts.length&&!productSalesError&&<p style={{fontSize:13,color:"#648378"}}>No POS product sales recorded in this period.</p>}
         </div>
       </section>
       <section style={{...panel,marginBottom:20}}>
