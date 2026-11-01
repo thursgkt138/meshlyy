@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import catalog from "../../../meshlyy-master-catalog.json";
 import imageReferences from "../../../meshlyy-source-image-references.json";
-import { useRetailerStore } from "../catalog/use-retailer-store";
+import { supabase, useRetailerStore } from "../catalog/use-retailer-store";
 
 type Product = {id:string;name:string;category:string;packSize:string|null;mrpReference:number|null};
 const products=catalog as Product[];
@@ -20,9 +20,31 @@ export default function RetailerDashboard(){
   const [filter,setFilter]=useState("all");
   const [editing,setEditing]=useState<string|null>(null);
   const [price,setPrice]=useState("");
-  const [stock,setStock]=useState("");
+
   const [notice,setNotice]=useState("");
   const [saving,setSaving]=useState(false);
+  const [posSales,setPosSales]=useState<{total:number;created_at:string}[]>([]);
+  const [pickup,setPickup]=useState<{status:string}[]>([]);
+  const [metricsError,setMetricsError]=useState("");
+  const [metricsLoading,setMetricsLoading]=useState(true);
+  useEffect(()=>{
+    if(!supabase||!r.storeId){setMetricsLoading(false);return;}
+    const client=supabase;let active=true;
+    const load=async()=>{
+      const start=new Date();start.setHours(0,0,0,0);
+      const [sales,orders]=await Promise.all([
+        client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",start.toISOString()).limit(1000),
+        client.from("pickup_reservations").select("status").eq("store_id",r.storeId).in("status",["requested","accepted"]).limit(100)
+      ]);
+      if(!active)return;
+      setMetricsError([sales.error?.message,orders.error?.message].filter(Boolean).join(" · "));
+      if(!sales.error)setPosSales((sales.data||[]) as {total:number;created_at:string}[]);
+      if(!orders.error)setPickup((orders.data||[]) as {status:string}[]);
+      setMetricsLoading(false);
+    };
+    void load();const timer=setInterval(()=>void load(),30000);
+    return()=>{active=false;clearInterval(timer);};
+  },[r.storeId]);
   const stats=useMemo(()=>({
     total:r.items.length,
     active:r.items.filter(i=>i.active&&i.stock>0).length,
@@ -37,14 +59,14 @@ export default function RetailerDashboard(){
     if(filter==="active"&&!(i.active&&i.stock>0))return false;
     return [p?.name,p?.category,p?.packSize,i.productId].join(" ").toLowerCase().includes(query.toLowerCase());
   }).sort((a,b)=>(byId.get(a.productId)?.name||a.productId).localeCompare(byId.get(b.productId)?.name||b.productId));
-  const startEdit=(i:typeof r.items[number])=>{setEditing(i.productId);setPrice(String(i.price));setStock(String(i.stock));setNotice("");};
+  const startEdit=(i:typeof r.items[number])=>{setEditing(i.productId);setPrice(String(i.price));setNotice("");};
   const save=async()=>{
-    const p=Number(price),s=Number(stock);
-    if(!editing||!Number.isFinite(p)||p<=0||!Number.isInteger(s)||s<0){setNotice("Enter a positive price and a whole-number quantity of zero or more.");return;}
+    const p=Number(price);
+    if(!editing||!Number.isFinite(p)||p<=0){setNotice("Enter a valid positive price.");return;}
     const original=r.items.find(i=>i.productId===editing);
     if(!original)return;
     setSaving(true);
-    const error=await r.save({...original,price:p,stock:s,active:s>0});
+    const error=await r.save({...original,price:p});
     setSaving(false);
     if(error)setNotice(error);else{setEditing(null);setNotice("Inventory saved in Supabase.");}
   };
@@ -61,6 +83,32 @@ export default function RetailerDashboard(){
         <div><p style={{margin:"0 0 4px",fontSize:12,color:"#537e73"}}>YOUR STORE</p><strong style={{fontSize:23}}>{r.storeName}</strong><p style={{margin:"6px 0 0",fontSize:13,color:"#537e73"}}>Inventory synced with Supabase</p></div>
         <Link href="/retailer/catalog" style={{...button,textDecoration:"none"}}>+ Add products</Link>
       </section>
+      <section aria-label="Business pulse" style={{margin:"22px 0"}}>
+        <h2>Today's business pulse</h2>
+        {metricsError&&<p role="alert" style={{color:"#a33b30"}}>{metricsError}</p>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:12}}>
+        {[
+          ["Walk-in revenue",metricsLoading?"Loading…":currency(posSales.reduce((a,s)=>a+Number(s.total),0))],
+          ["Walk-in transactions",metricsLoading?"Loading…":posSales.length],
+          ["New pickup requests",metricsLoading?"Loading…":pickup.filter(x=>x.status==="requested").length],
+          ["Awaiting collection",metricsLoading?"Loading…":pickup.filter(x=>x.status==="accepted").length]
+        ].map(([label,value])=><div key={label} style={panel}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong></div>)}
+        </div>
+        <p style={{fontSize:12,color:"#668277"}}>Updates every 30 seconds. POS revenue excludes pickup orders. Counts are limited to the most recent 1,000 POS sales and 100 open pickup orders.</p>
+      </section>
+      <section style={{...panel,marginBottom:20}}>
+        <h2 style={{marginTop:0}}>Quick actions</h2>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+        {[
+          ["/retailer/pos","New sale"],["/retailer/orders","Pickup orders"],["/retailer/stock","Stock adjustments"],["/retailer/sales","Sales & receipts"],["/retailer/catalog","Add products"]
+        ].map(([href,label])=><Link key={href} href={href} style={{...button,background:"#e5f1ea",color:"#143e38",textDecoration:"none"}}>{label} →</Link>)}
+        </div>
+      </section>
+      {(stats.low>0||stats.out>0)&&<section style={{...panel,marginBottom:20,background:"#fffdf6",borderColor:"#e9d7ae"}}>
+        <h2 style={{marginTop:0}}>Needs attention</h2>
+        <p>{stats.low} low-stock products and {stats.out} out-of-stock products.</p>
+        <Link href="/retailer/stock" style={{color:"#126c5b",fontWeight:700}}>Record a restock →</Link>
+      </section>}
       <section aria-label="Inventory overview" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,margin:"20px 0"}}>
         {[["Listed products",stats.total],["Available now",stats.active],["Low stock (1–5)",stats.low],["Out of stock",stats.out],["Stock value",currency(stats.value)]].map(([label,value])=><div key={label} style={panel}><p style={{fontSize:12,color:"#5e8177",margin:"0 0 12px"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong></div>)}
       </section>
@@ -84,7 +132,7 @@ export default function RetailerDashboard(){
                 <div><div style={{fontSize:11,color:"#65877e"}}>Your price</div><strong style={{fontSize:23}}>{currency(i.price)}</strong></div>
                 <div style={{textAlign:"right"}}><div style={{fontSize:11,color:"#65877e"}}>In stock</div><strong style={{fontSize:19}}>{i.stock}</strong></div>
               </div>
-              <button onClick={()=>startEdit(i)} style={{...button,width:"100%",padding:"12px 14px"}}>Edit price & stock</button>
+              <button onClick={()=>startEdit(i)} style={{...button,width:"100%",padding:"12px 14px"}}>Edit selling price</button>
             </div>
           </article>;})}
         </div>
@@ -100,7 +148,7 @@ export default function RetailerDashboard(){
       <div style={{...panel,width:"min(440px,100%)",boxSizing:"border-box"}}>
         <h2 style={{marginTop:0}}>Edit inventory</h2><p>{byId.get(editing)?.name||editing}</p>
         <label style={{display:"block",marginBottom:14}}>Selling price (₹)<input type="number" min="0.01" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} style={{...field,marginTop:6}}/></label>
-        <label style={{display:"block",marginBottom:14}}>Quantity<input type="number" min="0" step="1" value={stock} onChange={e=>setStock(e.target.value)} style={{...field,marginTop:6}}/></label>
+        <p>Use <Link href="/retailer/stock">Stock adjustments</Link> to change quantities with an audit trail.</p>
         {notice&&<p role="alert">{notice}</p>}
         <div style={{display:"flex",gap:10}}><button disabled={saving} onClick={()=>setEditing(null)} style={{...button,background:"#e4efea",color:"#143e38"}}>Cancel</button><button disabled={saving} onClick={save} style={button}>{saving?"Saving…":"Save changes"}</button></div>
       </div>
