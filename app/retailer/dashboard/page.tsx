@@ -29,6 +29,8 @@ export default function RetailerDashboard(){
   const [orderNotice,setOrderNotice]=useState("");
   const [metricsError,setMetricsError]=useState("");
   const [recentSales,setRecentSales]=useState<{total:number;created_at:string}[]>([]);
+  const [salesRange,setSalesRange]=useState<7|30>(7);
+  const [selectedDay,setSelectedDay]=useState<string|null>(null);
   const [searchDemand,setSearchDemand]=useState<{search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]>([]);
   const [searchDemandError,setSearchDemandError]=useState("");
   const [productEngagement,setProductEngagement]=useState<{product_id:string;unique_consumers:number;product_views:number;basket_adds:number;pickup_requests:number}[]>([]);
@@ -44,7 +46,7 @@ export default function RetailerDashboard(){
       const [sales,orders,recent]=await Promise.all([
         client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",start.toISOString()).limit(1000),
         client.from("pickup_reservations").select("id,status,requested_at,expires_at").eq("store_id",r.storeId).in("status",["requested","accepted"]).order("requested_at",{ascending:false}).limit(100),
-        client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",new Date(Date.now()-7*86400000).toISOString()).order("created_at",{ascending:false}).limit(1000)
+        client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",new Date(Date.now()-30*86400000).toISOString()).order("created_at",{ascending:false}).limit(1000)
       ]);
       if(!active)return;
       setMetricsError([sales.error?.message,orders.error?.message].filter(Boolean).join(" · "));
@@ -88,8 +90,15 @@ export default function RetailerDashboard(){
     out:r.items.filter(i=>i.stock===0).length,
     value:r.items.reduce((sum,i)=>sum+i.price*i.stock,0)
   }),[r.items]);
-  const dailySales=Array.from({length:7},(_,idx)=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(6-idx));const next=new Date(d);next.setDate(d.getDate()+1);return {label:d.toLocaleDateString("en-IN",{weekday:"short"}),value:recentSales.filter(s=>{const t=new Date(s.created_at).getTime();return t>=d.getTime()&&t<next.getTime();}).reduce((sum,s)=>sum+Number(s.total),0)};});
+  const dailySales=Array.from({length:salesRange},(_,idx)=>{
+    const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(salesRange-1-idx));
+    const next=new Date(d);next.setDate(d.getDate()+1);
+    const value=recentSales.filter(s=>{const t=new Date(s.created_at).getTime();return t>=d.getTime()&&t<next.getTime();}).reduce((sum,s)=>sum+Number(s.total),0);
+    return {key:d.toISOString().slice(0,10),label:d.toLocaleDateString("en-IN",{day:"numeric",month:"short"}),value};
+  });
   const maxDay=Math.max(1,...dailySales.map(d=>d.value));
+  const selectedSalesDay=dailySales.find(d=>d.key===selectedDay);
+  const rangeSales=dailySales.reduce((sum,d)=>sum+d.value,0);
   const topRisk=r.items.filter(i=>i.active&&i.stock<=5).sort((a,b)=>a.stock-b.stock).slice(0,5);
   const avgTicket=posSales.length?posSales.reduce((sum,s)=>sum+Number(s.total),0)/posSales.length:0;
   const rows=r.items.filter(i=>{
@@ -192,12 +201,16 @@ export default function RetailerDashboard(){
           </div>
         </div>
         <div style={{...panel,padding:26}}>
-          <p style={{fontSize:12,letterSpacing:2,color:"#548478",fontWeight:700}}>7-DAY SALES SNAPSHOT</p>
-          <h2 style={{fontSize:26,margin:"10px 0 8px"}}>{currency(recentSales.reduce((sum,s)=>sum+Number(s.total),0))}</h2>
-          <p style={{fontSize:13,color:"#648378"}}>POS revenue · latest {recentSales.length} transactions, up to 1,000</p>
-          <div style={{height:178,display:"flex",alignItems:"flex-end",gap:10,marginTop:25,borderBottom:"1px solid #dce8df",paddingBottom:12}}>
-          {dailySales.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",minWidth:0}} title={d.label+": "+currency(d.value)}><div style={{height:125,display:"flex",alignItems:"flex-end"}}><div style={{width:"100%",height:Math.max(5,125*d.value/maxDay),background:i===6?"#174e43":"#a9d7c3",borderRadius:"7px 7px 2px 2px"}}/></div><small style={{fontSize:11,color:"#638579",display:"block",marginTop:9}}>{d.label}</small></div>)}
+          <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <p style={{fontSize:12,letterSpacing:2,color:"#548478",fontWeight:700}}>SALES TREND · POS</p>
+            <div style={{display:"flex",gap:6}}>{([7,30] as const).map(n=><button key={n} type="button" aria-pressed={salesRange===n} onClick={()=>{setSalesRange(n);setSelectedDay(null);}} style={{...button,padding:"7px 10px",background:salesRange===n?"#143e38":"#e5f1ea",color:salesRange===n?"white":"#143e38"}}>{n} days</button>)}</div>
           </div>
+          <h2 style={{fontSize:26,margin:"10px 0 8px"}}>{currency(rangeSales)}</h2>
+          <p style={{fontSize:13,color:"#648378"}}>POS revenue · latest 1,000 sales over 30 days maximum</p>
+          <div style={{height:178,display:"flex",alignItems:"flex-end",gap:salesRange===7?10:3,marginTop:25,borderBottom:"1px solid #dce8df",paddingBottom:12}}>
+          {dailySales.map((d,i)=><button type="button" key={d.key} onClick={()=>setSelectedDay(d.key)} aria-label={d.label+": "+currency(d.value)} title={d.label+": "+currency(d.value)} style={{flex:1,textAlign:"center",minWidth:0,border:0,padding:0,background:"transparent",cursor:"pointer"}}><div style={{height:125,display:"flex",alignItems:"flex-end"}}><div style={{width:"100%",height:Math.max(5,125*d.value/maxDay),background:selectedDay===d.key?"#e6a15d":i===dailySales.length-1?"#174e43":"#a9d7c3",borderRadius:"5px 5px 2px 2px"}}/></div>{salesRange===7&&<small style={{fontSize:11,color:"#638579",display:"block",marginTop:9}}>{d.label}</small>}</button>)}
+          </div>
+          <p style={{fontSize:13,color:"#486b60",minHeight:18}}>{selectedSalesDay?selectedSalesDay.label+": "+currency(selectedSalesDay.value)+" in POS sales":"Select a bar to see that day's revenue."}</p>
           <Link href="/retailer/sales" style={{display:"inline-block",marginTop:24,color:"#146653",fontWeight:700}}>Explore transactions →</Link>
         </div>
       </section>
