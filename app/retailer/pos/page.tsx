@@ -45,7 +45,7 @@ export default function RetailerPOS(){
  const today=new Date().toDateString();
  const todaySales=useMemo(()=>sales.filter(s=>new Date(s.created_at).toDateString()===today),[sales,today]);
  return <main style={{minHeight:"100vh",background:"#f7faf7",color:"#14332e",fontFamily:"Arial,sans-serif",padding:"26px max(18px,calc((100vw - 1250px)/2))"}}>
-  <nav style={{display:"flex",justifyContent:"space-between",gap:14,flexWrap:"wrap"}}><Link href="/retailer/dashboard" style={{color:"#176c56"}}>← Inventory dashboard</Link><Link href="/retailer/orders" style={{color:"#176c56"}}>Pickup orders</Link></nav>
+  <nav style={{display:"flex",justifyContent:"space-between",gap:14,flexWrap:"wrap"}}><Link href="/retailer/dashboard" style={{color:"#176c56"}}>← Inventory dashboard</Link><Link href="/retailer/orders" style={{color:"#176c56"}}>Pickup orders</Link><Link href="/retailer/sales" style={{color:"#176c56"}}>Sales & receipts</Link><Link href="/retailer/stock" style={{color:"#176c56"}}>Stock adjustments</Link></nav>
   <p style={{fontSize:12,letterSpacing:2.5,color:"#5a8477",margin:"34px 0 7px"}}>MESHLYY / RETAILER STUDIO</p>
   <h1 style={{fontSize:"clamp(30px,5vw,48px)",margin:"0 0 8px"}}>In-store checkout.</h1>
   <p style={{color:"#668277",lineHeight:1.6}}>Bill walk-in customers from your live inventory. Each completed sale reduces available stock automatically. Pickup reservations are managed separately.</p>
