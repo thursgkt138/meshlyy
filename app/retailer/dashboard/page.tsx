@@ -17,6 +17,7 @@ const button:React.CSSProperties={background:"#143e38",color:"white",border:0,bo
 export default function RetailerDashboard(){
   const r=useRetailerStore();
   const [query,setQuery]=useState("");
+  const [showInventory,setShowInventory]=useState(false);
   const [filter,setFilter]=useState("all");
   const [editing,setEditing]=useState<string|null>(null);
   const [price,setPrice]=useState("");
@@ -144,18 +145,21 @@ export default function RetailerDashboard(){
       <Link href="/" style={{color:"#126c5b",textDecoration:"none",fontWeight:700}}>◈ meshlyy</Link>
       <div style={{display:"flex",gap:16,flexWrap:"wrap"}}><Link href="/retailer/pos" style={{color:"#126c5b",fontWeight:700}}>Open POS →</Link><Link href="/retailer/sales" style={{color:"#126c5b"}}>Sales & receipts</Link><Link href="/retailer/stock" style={{color:"#126c5b"}}>Stock adjustments</Link><Link href="/retailer/orders" style={{color:"#126c5b"}}>Pickup orders</Link><Link href="/retailer/catalog" style={{color:"#126c5b"}}>Master catalogue →</Link></div>
     </nav>
-    <p style={{letterSpacing:3,fontSize:12,color:"#477b70",marginTop:38}}>MESHLYY / RETAIL OPERATIONS</p>
-    <h1 style={{fontSize:"clamp(34px,5vw,56px)",letterSpacing:"-2px",margin:"8px 0 10px"}}>Your retail command centre.</h1>
-    <p style={{color:"#5b7770",lineHeight:1.6}}>Manage live inventory, check low-stock products, and open the POS to bill walk-in customers.</p>
+    <p style={{letterSpacing:3,fontSize:12,color:"#477b70",marginTop:18}}>MESHLYY / RETAIL OPERATIONS</p>
+    <h1 style={{fontSize:"clamp(28px,4vw,43px)",letterSpacing:"-2px",margin:"8px 0 10px"}}>Your retail command centre.</h1>
+    <p style={{color:"#5b7770",lineHeight:1.6}}>Live orders, sales, stock and insights in one workspace.</p>
     {r.loading?<p>Loading your store…</p>:r.error?<p role="alert" style={{color:"#a33b30"}}>{r.error}</p>:!r.user?<section style={panel}><h2>Sign in to continue</h2><p>Use the retailer account you created in the catalogue.</p><Link href="/retailer/catalog">Go to retailer sign in →</Link></section>:!r.storeId?<section style={panel}><h2>Set up your shop</h2><p>Create your store from the retailer catalogue first.</p><Link href="/retailer/catalog">Create my shop →</Link></section>:<>
-      <section style={{...panel,marginTop:24,background:"linear-gradient(110deg,#143e38,#236859)",color:"white",padding:30,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
-        <div><p style={{margin:"0 0 4px",fontSize:12,color:"#537e73"}}>YOUR STORE</p><strong style={{fontSize:23}}>{r.storeName}</strong><p style={{margin:"6px 0 0",fontSize:13,color:"#537e73"}}>Inventory synced with Supabase</p></div>
-        <Link href="/retailer/catalog" style={{...button,textDecoration:"none"}}>+ Add products</Link>
+      <section style={{...panel,marginTop:14,padding:"15px 19px",background:"#143e38",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div><small style={{color:"#b7d9c9",letterSpacing:1}}>ACTIVE STORE</small><strong style={{fontSize:20,display:"block",marginTop:3}}>{r.storeName}</strong></div>
+        <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
+          <Link href="/retailer/pos" style={{...button,textDecoration:"none",background:"#d6f2df",color:"#143e38",padding:"11px 14px"}}>+ New sale</Link>
+          <Link href="/retailer/catalog" style={{...button,textDecoration:"none",background:"#ffffff20",padding:"11px 14px"}}>+ Add product</Link>
+        </div>
       </section>
-      <section aria-label="Business pulse" style={{margin:"22px 0"}}>
-        <h2>Today's business pulse</h2>
+      <section aria-label="Business pulse" style={{margin:"14px 0"}}>
+        <h2 style={{fontSize:20,margin:"0 0 12px"}}>Today at a glance</h2>
         {metricsError&&<p role="alert" style={{color:"#a33b30"}}>{metricsError}</p>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
         {([
           ["Walk-in revenue",metricsLoading?"Loading…":currency(posSales.reduce((a,s)=>a+Number(s.total),0)),"/retailer/sales"],
           ["Walk-in transactions",metricsLoading?"Loading…":posSales.length,"/retailer/sales"],
@@ -263,7 +267,12 @@ export default function RetailerDashboard(){
           {!r.items.some(i=>i.active&&i.stock<=5)&&<p style={{fontSize:13,color:"#648378"}}>No active products are below the 5-unit alert threshold.</p>}
         </div>
       </section>
-      <section id="inventory-management" aria-label="Inventory overview" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,margin:"20px 0"}}>
+      <div id="inventory-management" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,margin:"18px 0",flexWrap:"wrap"}}>
+        <div><h2 style={{margin:0,fontSize:22}}>Inventory management</h2><p style={{margin:"5px 0 0",fontSize:13,color:"#648378"}}>Browse and edit product prices when needed.</p></div>
+        <button type="button" onClick={()=>setShowInventory(v=>!v)} aria-expanded={showInventory} style={{...button,background:"#e5f1ea",color:"#143e38"}}>{showInventory?"Hide product grid ↑":"Open product grid ↓"}</button>
+      </div>
+      {showInventory&&<>
+      <section aria-label="Inventory overview" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,margin:"20px 0"}}>
         {[["Listed products",stats.total],["Available now",stats.active],["Low stock (1–5)",stats.low],["Out of stock",stats.out],["Stock value",currency(stats.value)]].map(([label,value])=><div key={label} style={panel}><p style={{fontSize:12,color:"#5e8177",margin:"0 0 12px"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong></div>)}
       </section>
       <section style={panel}>
@@ -292,6 +301,7 @@ export default function RetailerDashboard(){
         </div>
         {!rows.length&&<p style={{color:"#6b827b"}}>{r.items.length?"No products match these filters.":"Your shop has no products yet. Add products from the master catalogue."}</p>}
       </section>
+      </>
       <section style={{...panel,marginTop:18}}>
         <h2 style={{marginTop:0}}>Pickup reservations</h2>
         <p style={{color:"#617c74"}}>Pickup requests and verified collections are managed from the live orders page.</p>
