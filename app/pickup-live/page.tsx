@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
 import catalog from "../../meshlyy-master-catalog.json";
 import images from "../../meshlyy-source-image-references.json";
@@ -26,6 +26,7 @@ export default function LivePickup(){
  const [codeBusy,setCodeBusy]=useState<string|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const [now,setNow]=useState(Date.now());
+ const lastTrackedSearch=useRef("");
  const load=useCallback(async()=>{
    if(!supabase){setMessage("Supabase configuration is missing.");setLoading(false);return;}
    const {data,error}=await supabase.rpc("discover_pickup_products",{p_query:"",p_locality:locality.trim(),p_limit:100});
@@ -76,6 +77,22 @@ export default function LivePickup(){
  },[acceptedIds,user]);
  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return ()=>clearInterval(id);},[]);
  const filtered=listings.filter(l=>[products.get(l.product_id)?.name,products.get(l.product_id)?.category,l.store_name,l.locality].join(" ").toLowerCase().includes(query.toLowerCase()));
+ // Track settled searches for signed-in users only; current listings are capped at 100.
+ useEffect(()=>{
+   const term=query.trim().toLowerCase().replace(/\s+/g," ");
+   if(!supabase||!user||loading||term.length<2||term.length>120)return;
+   const key=user+"|"+locality.trim().toLowerCase()+"|"+term;
+   if(key===lastTrackedSearch.current)return;
+   const timer=setTimeout(()=>{
+     if(!supabase)return;
+     const count=listings.filter(l=>[products.get(l.product_id)?.name,products.get(l.product_id)?.category,l.store_name,l.locality].join(" ").toLowerCase().includes(term)).length;
+     lastTrackedSearch.current=key;
+     void supabase.rpc("record_consumer_search",{p_query:term,p_result_count:count}).then(({error})=>{
+       if(error){lastTrackedSearch.current="";console.warn("Search analytics unavailable:",error.message);}
+     });
+   },1200);
+   return ()=>clearTimeout(timer);
+ },[query,user,locality,loading,listings]);
  const stores=useMemo(()=>new Map(listings.map(l=>[l.store_id,l.store_name])),[listings]);
  const selected=Object.entries(basket).filter(([,q])=>q>0).map(([key,q])=>{const l=listings.find(x=>x.store_id+":"+x.product_id===key);return l?{...l,quantity:q}:null;}).filter((x):x is Listing&{quantity:number}=>!!x);
  const groups=Array.from(new Set(selected.map(x=>x.store_id))).map(id=>({id,name:stores.get(id)||"Shop",lines:selected.filter(x=>x.store_id===id)}));
@@ -105,6 +122,7 @@ export default function LivePickup(){
   <p style={{letterSpacing:3,fontSize:12,color:"#53877a",marginTop:38}}>MESHLYY / NEIGHBOURHOOD PICKUP</p>
   <h1 style={{fontSize:"clamp(34px,5vw,58px)",margin:"8px 0"}}>Find it nearby. Pick it up.</h1>
   <p style={{color:"#597b71",lineHeight:1.6}}>Live shop listings from retailer inventory. Reserve at the shop's selling price, then collect in person once accepted.</p>
+  <p style={{fontSize:12,color:"#658477"}}>Signed-in searches contribute to aggregated marketplace analytics. Individual search histories are not shown to retailers.</p>
   <section style={{display:"flex",gap:10,flexWrap:"wrap",margin:"26px 0"}}><input aria-label="Search products" placeholder="Search products or shops…" style={{...input,flex:"2 1 260px"}} value={query} onChange={e=>setQuery(e.target.value)}/><input aria-label="Locality" placeholder="Filter by locality…" style={{...input,flex:"1 1 180px"}} value={locality} onChange={e=>setLocality(e.target.value)}/><button onClick={()=>void load()} style={button}>Refresh</button></section>
   {message&&<p role="status" style={{background:"#e7f1ea",borderRadius:10,padding:14}}>{message}</p>}
   <section style={{border:"1px solid #d8e6dd",background:"white",padding:20,borderRadius:18,marginBottom:24}}>
