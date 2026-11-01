@@ -52,6 +52,12 @@ export default function LivePickup(){
  },[]);
  useEffect(()=>{void loadOrders();},[loadOrders]);
  useEffect(()=>{if(!user)return;const timer=setInterval(()=>{void loadOrders();},10000);return ()=>clearInterval(timer);},[user,loadOrders]);
+ useEffect(()=>{
+   if(!supabase||!user)return;
+   const client=supabase;
+   const channel=client.channel("consumer-orders-"+user).on("postgres_changes",{event:"*",schema:"public",table:"pickup_reservations",filter:"customer_id=eq."+user},()=>{void loadOrders();}).subscribe();
+   return ()=>{void client.removeChannel(channel);};
+ },[user,loadOrders]);
  // Codes are issued by the database when the retailer accepts. Retrieve automatically.
  const acceptedIds=orders.filter(o=>o.status==="accepted"&&o.expires_at&&new Date(o.expires_at).getTime()>now).map(o=>o.id).join(",");
  useEffect(()=>{
