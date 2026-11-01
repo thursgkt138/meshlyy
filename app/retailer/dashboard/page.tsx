@@ -26,19 +26,22 @@ export default function RetailerDashboard(){
   const [posSales,setPosSales]=useState<{total:number;created_at:string}[]>([]);
   const [pickup,setPickup]=useState<{status:string}[]>([]);
   const [metricsError,setMetricsError]=useState("");
+  const [recentSales,setRecentSales]=useState<{total:number;created_at:string}[]>([]);
   const [metricsLoading,setMetricsLoading]=useState(true);
   useEffect(()=>{
     if(!supabase||!r.storeId){setMetricsLoading(false);return;}
     const client=supabase;let active=true;
     const load=async()=>{
       const start=new Date();start.setHours(0,0,0,0);
-      const [sales,orders]=await Promise.all([
+      const [sales,orders,recent]=await Promise.all([
         client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",start.toISOString()).limit(1000),
-        client.from("pickup_reservations").select("status").eq("store_id",r.storeId).in("status",["requested","accepted"]).limit(100)
+        client.from("pickup_reservations").select("status").eq("store_id",r.storeId).in("status",["requested","accepted"]).limit(100),
+        client.from("pos_sales").select("total,created_at").eq("store_id",r.storeId).gte("created_at",new Date(Date.now()-7*86400000).toISOString()).order("created_at",{ascending:false}).limit(1000)
       ]);
       if(!active)return;
       setMetricsError([sales.error?.message,orders.error?.message].filter(Boolean).join(" · "));
       if(!sales.error)setPosSales((sales.data||[]) as {total:number;created_at:string}[]);
+      if(!recent.error)setRecentSales((recent.data||[]) as {total:number;created_at:string}[]);
       if(!orders.error)setPickup((orders.data||[]) as {status:string}[]);
       setMetricsLoading(false);
     };
@@ -52,6 +55,10 @@ export default function RetailerDashboard(){
     out:r.items.filter(i=>i.stock===0).length,
     value:r.items.reduce((sum,i)=>sum+i.price*i.stock,0)
   }),[r.items]);
+  const dailySales=Array.from({length:7},(_,idx)=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(6-idx));const next=new Date(d);next.setDate(d.getDate()+1);return {label:d.toLocaleDateString("en-IN",{weekday:"short"}),value:recentSales.filter(s=>{const t=new Date(s.created_at).getTime();return t>=d.getTime()&&t<next.getTime();}).reduce((sum,s)=>sum+Number(s.total),0)};});
+  const maxDay=Math.max(1,...dailySales.map(d=>d.value));
+  const topRisk=r.items.filter(i=>i.active&&i.stock<=5).sort((a,b)=>a.stock-b.stock).slice(0,5);
+  const avgTicket=posSales.length?posSales.reduce((sum,s)=>sum+Number(s.total),0)/posSales.length:0;
   const rows=r.items.filter(i=>{
     const p=byId.get(i.productId);
     if(filter==="low"&&!(i.stock>0&&i.stock<=5))return false;
@@ -70,16 +77,16 @@ export default function RetailerDashboard(){
     setSaving(false);
     if(error)setNotice(error);else{setEditing(null);setNotice("Inventory saved in Supabase.");}
   };
-  return <main style={{minHeight:"100vh",background:"#f7faf7",color:"#102f30",padding:"28px max(20px,calc((100vw - 1150px)/2))",fontFamily:"Arial,sans-serif"}}>
+  return <main style={{minHeight:"100vh",background:"#f4f6f3",color:"#102f30",padding:"28px max(20px,calc((100vw - 1280px)/2))",fontFamily:"Arial,sans-serif"}}>
     <nav style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <Link href="/" style={{color:"#126c5b",textDecoration:"none",fontWeight:700}}>◈ meshlyy</Link>
       <div style={{display:"flex",gap:16,flexWrap:"wrap"}}><Link href="/retailer/pos" style={{color:"#126c5b",fontWeight:700}}>Open POS →</Link><Link href="/retailer/sales" style={{color:"#126c5b"}}>Sales & receipts</Link><Link href="/retailer/stock" style={{color:"#126c5b"}}>Stock adjustments</Link><Link href="/retailer/orders" style={{color:"#126c5b"}}>Pickup orders</Link><Link href="/retailer/catalog" style={{color:"#126c5b"}}>Master catalogue →</Link></div>
     </nav>
-    <p style={{letterSpacing:3,fontSize:12,color:"#477b70",marginTop:38}}>RETAILER STUDIO / DASHBOARD</p>
-    <h1 style={{fontSize:"clamp(30px,5vw,50px)",margin:"8px 0 10px"}}>Your shop, at a glance.</h1>
+    <p style={{letterSpacing:3,fontSize:12,color:"#477b70",marginTop:38}}>MESHLYY / RETAIL OPERATIONS</p>
+    <h1 style={{fontSize:"clamp(34px,5vw,56px)",letterSpacing:"-2px",margin:"8px 0 10px"}}>Your retail command centre.</h1>
     <p style={{color:"#5b7770",lineHeight:1.6}}>Manage live inventory, check low-stock products, and open the POS to bill walk-in customers.</p>
     {r.loading?<p>Loading your store…</p>:r.error?<p role="alert" style={{color:"#a33b30"}}>{r.error}</p>:!r.user?<section style={panel}><h2>Sign in to continue</h2><p>Use the retailer account you created in the catalogue.</p><Link href="/retailer/catalog">Go to retailer sign in →</Link></section>:!r.storeId?<section style={panel}><h2>Set up your shop</h2><p>Create your store from the retailer catalogue first.</p><Link href="/retailer/catalog">Create my shop →</Link></section>:<>
-      <section style={{...panel,marginTop:24,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+      <section style={{...panel,marginTop:24,background:"linear-gradient(110deg,#143e38,#236859)",color:"white",padding:30,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div><p style={{margin:"0 0 4px",fontSize:12,color:"#537e73"}}>YOUR STORE</p><strong style={{fontSize:23}}>{r.storeName}</strong><p style={{margin:"6px 0 0",fontSize:13,color:"#537e73"}}>Inventory synced with Supabase</p></div>
         <Link href="/retailer/catalog" style={{...button,textDecoration:"none"}}>+ Add products</Link>
       </section>
@@ -97,13 +104,38 @@ export default function RetailerDashboard(){
         <p style={{fontSize:12,color:"#668277"}}>Updates every 30 seconds. POS revenue excludes pickup orders. Counts are limited to the most recent 1,000 POS sales and 100 open pickup orders.</p>
       </section>
       <section style={{...panel,marginBottom:20}}>
-        <h2 style={{marginTop:0}}>Quick actions</h2>
+        <h2 style={{marginTop:0}}>Operations hub</h2>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         {[
           ["/retailer/pos","New sale"],["/retailer/orders","Pickup orders"],["/retailer/stock","Stock adjustments"],["/retailer/sales","Sales & receipts"],["/retailer/catalog","Add products"]
         ].map(([href,label])=><Link key={href} href={href} style={{...button,background:"#e5f1ea",color:"#143e38",textDecoration:"none"}}>{label} →</Link>)}
         </div>
       </section>
+      <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(310px,1fr))",gap:18,marginBottom:22}}>
+        <div style={{...panel,padding:26,background:"#102f30",color:"white",border:"none"}}>
+          <p style={{fontSize:12,letterSpacing:2,color:"#9ccebd",fontWeight:700}}>BUSINESS INTELLIGENCE · LIVE DATA</p>
+          <h2 style={{fontSize:27,margin:"10px 0 8px"}}>Insights for your store</h2>
+          <p style={{fontSize:13,color:"#c4ddd4",lineHeight:1.6}}>Automated insights based on your POS transactions and current stock. Not generative AI.</p>
+          <div style={{display:"grid",gap:10,marginTop:20}}>
+            <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>Today's average bill · {currency(avgTicket)}</strong><p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>{posSales.length?posSales.length+" recorded POS transactions today.":"Record POS sales to start tracking basket value."}</p></div>
+            <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>{stats.out+stats.low} products need attention</strong><p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>{stats.out} out of stock · {stats.low} running low. Prioritise restocking active products.</p></div>
+            <div style={{background:"#ffffff12",padding:15,borderRadius:13}}><strong>Consumer search demand</strong><p style={{fontSize:13,color:"#c4ddd4",margin:"6px 0 0"}}>Not available yet. Search-event tracking must be enabled before demand insights can be calculated.</p></div>
+          </div>
+        </div>
+        <div style={{...panel,padding:26}}>
+          <p style={{fontSize:12,letterSpacing:2,color:"#548478",fontWeight:700}}>7-DAY SALES SNAPSHOT</p>
+          <h2 style={{fontSize:26,margin:"10px 0 8px"}}>{currency(recentSales.reduce((sum,s)=>sum+Number(s.total),0))}</h2>
+          <p style={{fontSize:13,color:"#648378"}}>POS revenue · latest {recentSales.length} transactions, up to 1,000</p>
+          <div style={{height:178,display:"flex",alignItems:"flex-end",gap:10,marginTop:25,borderBottom:"1px solid #dce8df",paddingBottom:12}}>
+          {dailySales.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",minWidth:0}} title={d.label+": "+currency(d.value)}><div style={{height:125,display:"flex",alignItems:"flex-end"}}><div style={{width:"100%",height:Math.max(5,125*d.value/maxDay),background:i===6?"#174e43":"#a9d7c3",borderRadius:"7px 7px 2px 2px"}}/></div><small style={{fontSize:11,color:"#638579",display:"block",marginTop:9}}>{d.label}</small></div>)}
+          </div>
+          <Link href="/retailer/sales" style={{display:"inline-block",marginTop:24,color:"#146653",fontWeight:700}}>Explore transactions →</Link>
+        </div>
+      </section>
+      {topRisk.length>0&&<section style={{...panel,marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><p style={{fontSize:12,letterSpacing:2,color:"#a36926"}}>RESTOCK PRIORITY</p><h2 style={{margin:"5px 0 14px"}}>Products to replenish</h2></div><Link href="/retailer/stock" style={{...button,textDecoration:"none"}}>Adjust stock →</Link></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>{topRisk.map(i=><div key={i.productId} style={{background:"#f7f9f6",padding:14,borderRadius:13,border:"1px solid #e1eae3"}}><strong style={{fontSize:13}}>{byId.get(i.productId)?.name||i.productId}</strong><p style={{color:i.stock===0?"#b44b36":"#9c6b21",fontWeight:700,margin:"9px 0 0"}}>{i.stock} units left</p></div>)}</div>
+      </section>}
       {(stats.low>0||stats.out>0)&&<section style={{...panel,marginBottom:20,background:"#fffdf6",borderColor:"#e9d7ae"}}>
         <h2 style={{marginTop:0}}>Needs attention</h2>
         <p>{stats.low} low-stock products and {stats.out} out-of-stock products.</p>
