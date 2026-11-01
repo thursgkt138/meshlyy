@@ -34,6 +34,7 @@ export default function RetailerOrders(){
    if(lines.error)setError(lines.error.message);else setItems((lines.data||[]) as Item[]);
  },[store.storeId]);
  useEffect(()=>{void refresh();},[refresh]);
+ useEffect(()=>{if(!store.storeId)return;const timer=setInterval(()=>{void refresh();},10000);return ()=>clearInterval(timer);},[store.storeId,refresh]);
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);return ()=>clearInterval(t);},[]);
  const action=async(id:string,type:"accept"|"reject"|"expire")=>{
    if(!supabase)return;
