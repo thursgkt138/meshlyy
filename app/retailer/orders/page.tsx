@@ -35,6 +35,12 @@ export default function RetailerOrders(){
  },[store.storeId]);
  useEffect(()=>{void refresh();},[refresh]);
  useEffect(()=>{if(!store.storeId)return;const timer=setInterval(()=>{void refresh();},10000);return ()=>clearInterval(timer);},[store.storeId,refresh]);
+ useEffect(()=>{
+   if(!supabase||!store.storeId)return;
+   const client=supabase;
+   const channel=client.channel("retailer-orders-"+store.storeId).on("postgres_changes",{event:"*",schema:"public",table:"pickup_reservations",filter:"store_id=eq."+store.storeId},()=>{void refresh();}).subscribe();
+   return ()=>{void client.removeChannel(channel);};
+ },[store.storeId,refresh]);
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);return ()=>clearInterval(t);},[]);
  const action=async(id:string,type:"accept"|"reject"|"expire")=>{
    if(!supabase)return;
