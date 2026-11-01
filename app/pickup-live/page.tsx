@@ -194,7 +194,7 @@ export default function LivePickup(){
             </div>
             <aside style={{background:"#f4faf5",borderLeft:"1px solid #e4eee7",padding:"24px",display:"flex",flexDirection:"column",justifyContent:"center",gap:16}}>
               <div><div style={{fontSize:11,letterSpacing:1.4,color:"#6d8a7c",fontWeight:700}}>ORDER PROGRESS</div>
-                <div style={{display:"flex",gap:8,marginTop:15}}>{[0,1,2].map((step)=><div key={step} style={{height:6,flex:1,borderRadius:99,background:step===0?"#23765c":step===1&&accepted?"#23765c":"#d7e6da"}}/>)}</div>
+                <div style={{display:"flex",gap:8,marginTop:15}}>{[0,1,2].map((step)=><div key={step} style={{height:6,flex:1,borderRadius:99,background:(step===0||step===1&&(accepted||o.status==="completed")||step===2&&o.status==="completed")?"#23765c":"#d7e6da"}}/>)}</div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#678579",marginTop:9}}><span>Requested</span><span>Accepted</span><span>Collected</span></div>
               </div>
               {accepted&&remaining!==null&&remaining>0&&<div style={{background:"#fff",border:"1px solid #d6e8dc",borderRadius:13,padding:17}}><strong style={{fontSize:13}}>Your secure pickup code</strong><p style={{fontSize:12,color:"#69877b",lineHeight:1.5,margin:"7px 0 12px"}}>Automatically issued when the shop accepts. Share only with shop staff at collection.</p>{pickupCodes[o.id]?<div aria-label="Six digit pickup code" style={{fontSize:30,letterSpacing:7,fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#165c47",textAlign:"center"}}>{pickupCodes[o.id]}</div>:<p role="status" style={{fontSize:13,color:"#69877b"}}>Loading your pickup code…</p>}</div>}
