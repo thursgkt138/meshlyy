@@ -51,6 +51,7 @@ export default function LivePickup(){
    return ()=>data.subscription.unsubscribe();
  },[]);
  useEffect(()=>{void loadOrders();},[loadOrders]);
+ useEffect(()=>{if(!user)return;const timer=setInterval(()=>{void loadOrders();},10000);return ()=>clearInterval(timer);},[user,loadOrders]);
  // Codes are issued by the database when the retailer accepts. Retrieve automatically.
  const acceptedIds=orders.filter(o=>o.status==="accepted"&&o.expires_at&&new Date(o.expires_at).getTime()>now).map(o=>o.id).join(",");
  useEffect(()=>{
