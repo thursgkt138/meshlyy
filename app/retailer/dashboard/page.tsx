@@ -165,7 +165,10 @@ export default function RetailerDashboard(){
         </div>
         <p style={{fontSize:12,color:"#668277"}}>Updates every 30 seconds. POS revenue excludes pickup orders. Counts are limited to the most recent 1,000 POS sales and 100 open pickup orders.</p>
       </section>
-      <section style={{...panel,marginBottom:20,borderColor:pickup.some(o=>o.status==="requested")?"#c9dfce":"#dce9e2"}}>
+      <nav aria-label="Dashboard sections" style={{display:"flex",gap:9,flexWrap:"wrap",margin:"12px 0 20px"}}>
+        {([["#live-orders","Orders"],["#sales-insights","Sales"],["#product-insights","Products"],["#stock-health","Stock"],["#inventory-management","Inventory"]] as [string,string][]).map(([href,label])=><a key={href} href={href} style={{...button,textDecoration:"none",background:"#e5f1ea",color:"#143e38",padding:"10px 15px"}}>{label} ↓</a>)}
+      </nav>
+      <section id="live-orders" style={{...panel,marginBottom:20,borderColor:pickup.some(o=>o.status==="requested")?"#c9dfce":"#dce9e2"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
           <div><p style={{fontSize:11,letterSpacing:2,color:"#397e67",fontWeight:700,margin:"0 0 6px"}}>LIVE ORDER INBOX</p><h2 style={{margin:0}}>Pickup requests <span style={{fontSize:16,color:"#5e8177"}}>({pickup.filter(o=>o.status==="requested").length} new)</span></h2></div>
           <Link href="/retailer/orders?status=all" style={{...button,textDecoration:"none",background:"#e5f1ea",color:"#143e38"}}>All orders →</Link>
@@ -184,15 +187,7 @@ export default function RetailerDashboard(){
         </div>
         {pickup.length>5&&<p style={{fontSize:12,color:"#648378"}}>Showing the 5 most recent open requests. <Link href="/retailer/orders?status=all">View all</Link></p>}
       </section>
-      <section style={{...panel,marginBottom:20}}>
-        <h2 style={{marginTop:0}}>Operations hub</h2>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-        {[
-          ["/retailer/pos","New sale"],["/retailer/orders","Pickup orders"],["/retailer/stock","Stock adjustments"],["/retailer/sales","Sales & receipts"],["/retailer/catalog","Add products"]
-        ].map(([href,label])=><Link key={href} href={href} style={{...button,background:"#e5f1ea",color:"#143e38",textDecoration:"none"}}>{label} →</Link>)}
-        </div>
-      </section>
-      <section style={{...panel,marginBottom:22}}>
+      <section id="pickup-conversion" style={{...panel,marginBottom:22}}>
         <h2 style={{marginTop:0}}>Pickup conversion · last 30 days</h2>
         <p style={{fontSize:13,color:"#648378"}}>Based on actual reservation statuses, not product interaction events. Latest 1,000 requests maximum.</p>
         {funnelError?<p role="alert">{funnelError}</p>:(()=>{
@@ -208,7 +203,7 @@ export default function RetailerDashboard(){
           </div><p style={{fontSize:13,color:"#486b60",marginBottom:0}}>Collected / requested: <strong>{total?(100*complete/total).toFixed(1)+"%":"No requests yet"}</strong>. Pending and active reservations remain in the denominator; this is a current cohort snapshot, not a final conversion rate.</p></>;
         })()}
       </section>
-      <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(310px,1fr))",gap:18,marginBottom:22}}>
+      <section id="sales-insights" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(310px,1fr))",gap:18,marginBottom:22}}>
         <div style={{...panel,padding:26,background:"#102f30",color:"white",border:"none"}}>
           <p style={{fontSize:12,letterSpacing:2,color:"#9ccebd",fontWeight:700}}>BUSINESS INTELLIGENCE · LIVE DATA</p>
           <h2 style={{fontSize:27,margin:"10px 0 8px"}}>Insights for your store</h2>
@@ -234,7 +229,7 @@ export default function RetailerDashboard(){
           <Link href="/retailer/sales" style={{display:"inline-block",marginTop:24,color:"#146653",fontWeight:700}}>Explore transactions →</Link>
         </div>
       </section>
-      <section style={{...panel,marginBottom:20}}>
+      <section id="product-insights" style={{...panel,marginBottom:20}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
           <div><p style={{fontSize:11,letterSpacing:2,color:"#548478",fontWeight:700}}>PRODUCT PERFORMANCE</p><h2 style={{margin:"6px 0"}}>Top-selling products</h2></div>
           <Link href="/retailer/sales" style={{...button,textDecoration:"none"}}>Sales report →</Link>
@@ -249,7 +244,7 @@ export default function RetailerDashboard(){
           {!rankedProducts.length&&!productSalesError&&<p style={{fontSize:13,color:"#648378"}}>No POS product sales recorded in this period.</p>}
         </div>
       </section>
-      <section style={{...panel,marginBottom:20}}>
+      <section id="stock-health" style={{...panel,marginBottom:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <div><p style={{fontSize:11,letterSpacing:2,color:"#548478",fontWeight:700}}>STOCK HEALTH</p><h2 style={{margin:"6px 0"}}>Inventory at a glance</h2></div>
           <Link href="/retailer/stock" style={{...button,textDecoration:"none"}}>Stock control →</Link>
@@ -268,16 +263,7 @@ export default function RetailerDashboard(){
           {!r.items.some(i=>i.active&&i.stock<=5)&&<p style={{fontSize:13,color:"#648378"}}>No active products are below the 5-unit alert threshold.</p>}
         </div>
       </section>
-      {topRisk.length>0&&<section style={{...panel,marginBottom:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><p style={{fontSize:12,letterSpacing:2,color:"#a36926"}}>RESTOCK PRIORITY</p><h2 style={{margin:"5px 0 14px"}}>Products to replenish</h2></div><Link href="/retailer/stock" style={{...button,textDecoration:"none"}}>Adjust stock →</Link></div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>{topRisk.map(i=><div key={i.productId} style={{background:"#f7f9f6",padding:14,borderRadius:13,border:"1px solid #e1eae3"}}><strong style={{fontSize:13}}>{byId.get(i.productId)?.name||i.productId}</strong><p style={{color:i.stock===0?"#b44b36":"#9c6b21",fontWeight:700,margin:"9px 0 0"}}>{i.stock} units left</p></div>)}</div>
-      </section>}
-      {(stats.low>0||stats.out>0)&&<section style={{...panel,marginBottom:20,background:"#fffdf6",borderColor:"#e9d7ae"}}>
-        <h2 style={{marginTop:0}}>Needs attention</h2>
-        <p>{stats.low} low-stock products and {stats.out} out-of-stock products.</p>
-        <Link href="/retailer/stock" style={{color:"#126c5b",fontWeight:700}}>Record a restock →</Link>
-      </section>}
-      <section aria-label="Inventory overview" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,margin:"20px 0"}}>
+      <section id="inventory-management" aria-label="Inventory overview" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,margin:"20px 0"}}>
         {[["Listed products",stats.total],["Available now",stats.active],["Low stock (1–5)",stats.low],["Out of stock",stats.out],["Stock value",currency(stats.value)]].map(([label,value])=><div key={label} style={panel}><p style={{fontSize:12,color:"#5e8177",margin:"0 0 12px"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong></div>)}
       </section>
       <section style={panel}>
