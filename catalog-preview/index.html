@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meshlyy · Product catalogue preview</title>
+<style>body{margin:0;background:#faf9f6;color:#192820;font:16px system-ui,sans-serif}header{padding:28px max(24px,calc((100vw - 1100px)/2));background:#e8f1e8}h1{margin:0;font-size:32px}main{max-width:1100px;margin:auto;padding:24px}input{padding:12px;border:1px solid #bdc9bd;border-radius:10px;max-width:100%}#search{width:360px}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:24px}.product{background:white;border:1px solid #e3e9e3;border-radius:16px;padding:16px}.image{height:130px;background:#f0f2ed;border-radius:10px;display:grid;place-items:center;color:#68786c;font-size:13px}.product h3{font-size:16px;margin:12px 0 4px}.muted{color:#65736a;font-size:13px}.price{font-weight:700;margin-top:12px}.notice{font-size:13px;color:#526157;line-height:1.6}</style></head>
+<body><header><h1>meshlyy</h1><p>Discover everyday essentials in your neighbourhood.</p></header><main><h2>Product catalogue preview</h2><p class="notice">Catalogue discovery only. Prices and availability are not verified with local retailers. Products cannot be reserved until a retailer confirms an offer.</p><div class="controls"><label>Import product JSON <input id="upload" type="file" accept=".json,application/json"></label><input id="search" type="search" placeholder="Search products, brands, categories"><select id="category"><option value="">All categories</option></select></div><p id="status" class="muted">Select a scraped product JSON file to preview a cleaned catalogue.</p><section id="grid" class="grid"></section></main>
+<script>
+const $=id=>document.getElementById(id);let items=[];
+const txt=x=>typeof x==='string'?x.trim():'';
+const cleanName=s=>txt(s).replace(/\\bblinkit\\b/gi,'').replace(/\\s+/g,' ').trim();
+function normalize(data){
+ const source=Array.isArray(data)?data:Array.isArray(data.products)?data.products:[];
+ const seen=new Set(),out=[];
+ for(const p of source){
+  if(!p||typeof p!=='object')continue;
+  const name=cleanName(p.name||p.product_name||p.title);
+  if(!name||name.length<3||/^(add|options|view all|shop now|10 mins)$/i.test(name))continue;
+  const size=txt(p.size||p.pack_size||p.quantity),brand=txt(p.brand);
+  const key=[name.toLowerCase(),size.toLowerCase(),brand.toLowerCase()].join('|');
+  if(seen.has(key))continue;seen.add(key);
+  const category=txt(p.subcategory||p.category)||'Other';
+  const rawPrice=Number(p.mrp),mrp=Number.isFinite(rawPrice)&&rawPrice>0?rawPrice:null;
+  // Exclude source retailer prices from consumer-facing listings.
+  out.push({id:key,name,size,brand,category,mrp});
+ }
+ return out;
+}
+function render(){
+ const query=$('search').value.toLowerCase(),category=$('category').value;
+ const visible=items.filter(p=>(!category||p.category===category)&&[p.name,p.brand,p.category,p.size].join(' ').toLowerCase().includes(query));
+ $('status').textContent=visible.length+' products shown · '+items.length+' unique products imported';
+ $('grid').replaceChildren(...visible.slice(0,300).map(p=>{
+  const card=document.createElement('article');card.className='product';
+  const image=document.createElement('div');image.className='image';image.textContent='Product image pending approval';card.append(image);
+  const h=document.createElement('h3');h.textContent=p.name;card.append(h);
+  const meta=document.createElement('div');meta.className='muted';meta.textContent=[p.brand,p.size,p.category].filter(Boolean).join(' · ');card.append(meta);
+  const price=document.createElement('div');price.className='price';price.textContent=p.mrp?'MRP ₹'+p.mrp:'Price at store';card.append(price);
+  const availability=document.createElement('div');availability.className='muted';availability.textContent='Check with local retailer';card.append(availability);
+  return card;
+ }));
+}
+$('upload').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{items=normalize(JSON.parse(await file.text()));const categories=[...new Set(items.map(p=>p.category))].sort();$('category').replaceChildren(new Option('All categories',''),...categories.map(x=>new Option(x,x)));render();}catch(err){$('status').textContent='Could not read JSON: '+err.message;}});
+$('search').addEventListener('input',render);$('category').addEventListener('change',render);
+</script></body></html>
