@@ -31,6 +31,8 @@ export default function RetailerDashboard(){
   const [searchDemandError,setSearchDemandError]=useState("");
   const [productEngagement,setProductEngagement]=useState<{product_id:string;unique_consumers:number;product_views:number;basket_adds:number;pickup_requests:number}[]>([]);
   const [engagementError,setEngagementError]=useState("");
+  const [pickupFunnel,setPickupFunnel]=useState<{status:string}[]>([]);
+  const [funnelError,setFunnelError]=useState("");
   const [metricsLoading,setMetricsLoading]=useState(true);
   useEffect(()=>{
     if(!supabase||!r.storeId){setMetricsLoading(false);return;}
@@ -51,7 +53,15 @@ export default function RetailerDashboard(){
     };
     const loadDemand=async()=>{const result=await client.rpc("get_store_search_demand",{p_store_id:r.storeId,p_days:30});if(!active)return;if(result.error)setSearchDemandError(result.error.message);else{setSearchDemandError("");setSearchDemand((result.data||[]) as {search_term:string;searches:number;unique_consumers:number;zero_result_searches:number}[]);}};
     const loadEngagement=async()=>{const result=await client.rpc("get_store_product_engagement",{p_store_id:r.storeId,p_days:30});if(!active)return;if(result.error)setEngagementError(result.error.message);else{setEngagementError("");setProductEngagement((result.data||[]) as {product_id:string;unique_consumers:number;product_views:number;basket_adds:number;pickup_requests:number}[]);}};
-    void load();void loadDemand();void loadEngagement();const timer=setInterval(()=>void load(),30000);
+    const loadFunnel=async()=>{
+      const since=new Date(Date.now()-30*86400000).toISOString();
+      const result=await client.from("pickup_reservations").select("status").eq("store_id",r.storeId).gte("requested_at",since).limit(1000);
+      if(!active)return;
+      if(result.error)setFunnelError(result.error.message);
+      else{setFunnelError("");setPickupFunnel((result.data||[]) as {status:string}[]);}
+    };
+    void load();void loadDemand();void loadEngagement();void loadFunnel();
+    const timer=setInterval(()=>{void load();void loadFunnel();},30000);
     return()=>{active=false;clearInterval(timer);};
   },[r.storeId]);
   const stats=useMemo(()=>({
@@ -116,6 +126,22 @@ export default function RetailerDashboard(){
           ["/retailer/pos","New sale"],["/retailer/orders","Pickup orders"],["/retailer/stock","Stock adjustments"],["/retailer/sales","Sales & receipts"],["/retailer/catalog","Add products"]
         ].map(([href,label])=><Link key={href} href={href} style={{...button,background:"#e5f1ea",color:"#143e38",textDecoration:"none"}}>{label} →</Link>)}
         </div>
+      </section>
+      <section style={{...panel,marginBottom:22}}>
+        <h2 style={{marginTop:0}}>Pickup conversion · last 30 days</h2>
+        <p style={{fontSize:13,color:"#648378"}}>Based on actual reservation statuses, not product interaction events. Latest 1,000 requests maximum.</p>
+        {funnelError?<p role="alert">{funnelError}</p>:(()=>{
+          const total=pickupFunnel.length;
+          const counts=(s:string)=>pickupFunnel.filter(x=>x.status===s).length;
+          const complete=counts("completed");
+          const accepted=counts("accepted");
+          const rejected=counts("rejected");
+          const expired=counts("expired");
+          const pending=counts("requested");
+          return <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12}}>
+            {([["Requested",total],["Awaiting decision",pending],["Ready for collection",accepted],["Collected",complete],["Rejected",rejected],["Expired",expired]] as [string,number][]).map(([label,value])=><div key={label} style={{background:"#f4f8f5",borderRadius:12,padding:15}}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:24}}>{value}</strong></div>)}
+          </div><p style={{fontSize:13,color:"#486b60",marginBottom:0}}>Collected / requested: <strong>{total?(100*complete/total).toFixed(1)+"%":"No requests yet"}</strong>. Pending and active reservations remain in the denominator; this is a current cohort snapshot, not a final conversion rate.</p></>;
+        })()}
       </section>
       <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(310px,1fr))",gap:18,marginBottom:22}}>
         <div style={{...panel,padding:26,background:"#102f30",color:"white",border:"none"}}>
