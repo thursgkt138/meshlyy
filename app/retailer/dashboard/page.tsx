@@ -110,12 +110,12 @@ export default function RetailerDashboard(){
         <h2>Today's business pulse</h2>
         {metricsError&&<p role="alert" style={{color:"#a33b30"}}>{metricsError}</p>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:12}}>
-        {[
-          ["Walk-in revenue",metricsLoading?"Loading…":currency(posSales.reduce((a,s)=>a+Number(s.total),0))],
-          ["Walk-in transactions",metricsLoading?"Loading…":posSales.length],
-          ["New pickup requests",metricsLoading?"Loading…":pickup.filter(x=>x.status==="requested").length],
-          ["Awaiting collection",metricsLoading?"Loading…":pickup.filter(x=>x.status==="accepted").length]
-        ].map(([label,value])=><div key={label} style={panel}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong></div>)}
+        {([
+          ["Walk-in revenue",metricsLoading?"Loading…":currency(posSales.reduce((a,s)=>a+Number(s.total),0)),"/retailer/sales"],
+          ["Walk-in transactions",metricsLoading?"Loading…":posSales.length,"/retailer/sales"],
+          ["New pickup requests",metricsLoading?"Loading…":pickup.filter(x=>x.status==="requested").length,"/retailer/orders?status=requested"],
+          ["Awaiting collection",metricsLoading?"Loading…":pickup.filter(x=>x.status==="accepted").length,"/retailer/orders?status=accepted"]
+        ] as [string,string|number,string][]).map(([label,value,href])=><Link key={label} href={href} style={{...panel,textDecoration:"none",color:"#102f30",display:"block",cursor:"pointer",transition:"transform .15s,box-shadow .15s"}} title={"Open "+label.toLowerCase()}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong><p style={{fontSize:12,color:"#116d5a",marginBottom:0}}>View details →</p></Link>)}
         </div>
         <p style={{fontSize:12,color:"#668277"}}>Updates every 30 seconds. POS revenue excludes pickup orders. Counts are limited to the most recent 1,000 POS sales and 100 open pickup orders.</p>
       </section>
@@ -139,7 +139,7 @@ export default function RetailerDashboard(){
           const expired=counts("expired");
           const pending=counts("requested");
           return <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12}}>
-            {([["Requested",total],["Awaiting decision",pending],["Ready for collection",accepted],["Collected",complete],["Rejected",rejected],["Expired",expired]] as [string,number][]).map(([label,value])=><div key={label} style={{background:"#f4f8f5",borderRadius:12,padding:15}}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:24}}>{value}</strong></div>)}
+            {([["Requested",total,"all"],["Awaiting decision",pending,"requested"],["Ready for collection",accepted,"accepted"],["Collected",complete,"completed"],["Rejected",rejected,"rejected"],["Expired",expired,"expired"]] as [string,number,string][]).map(([label,value,status])=><Link key={label} href={"/retailer/orders?status="+status} style={{background:"#f4f8f5",borderRadius:12,padding:15,textDecoration:"none",color:"#102f30",display:"block"}}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:24}}>{value}</strong><div style={{height:5,background:"#dbe9e0",borderRadius:4,marginTop:12,overflow:"hidden"}}><div style={{height:"100%",width:(total?100*value/total:0)+"%",background:"#19745d",borderRadius:4}}/></div><small style={{color:"#116d5a"}}>View orders →</small></Link>)}
           </div><p style={{fontSize:13,color:"#486b60",marginBottom:0}}>Collected / requested: <strong>{total?(100*complete/total).toFixed(1)+"%":"No requests yet"}</strong>. Pending and active reservations remain in the denominator; this is a current cohort snapshot, not a final conversion rate.</p></>;
         })()}
       </section>
