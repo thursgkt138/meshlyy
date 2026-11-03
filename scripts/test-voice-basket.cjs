@@ -3,8 +3,8 @@ const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm"),asse
 const ts=require("typescript");
 const source=fs.readFileSync(path.join(__dirname,"../app/retailer/assistant/basket-engine.ts"),"utf8");
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-const exports={};vm.runInNewContext(compiled,{exports,require,console});
-const {parseBasket,resolveBasket}=exports;
+const moduleExports={};vm.runInNewContext(compiled,{exports:moduleExports,require,console});
+const {parseBasket,resolveBasket}=moduleExports;
 const inventory=[{id:"m1",name:"Amul Gold Milk",stock:6},{id:"m2",name:"Heritage Toned Milk",stock:16},{id:"b1",name:"Multigrain Bread",stock:1},{id:"e1",name:"Farm Fresh Eggs",stock:12},{id:"p1",name:"Loose Potato",stock:8}];
 const cases=[
  ["Ek dudh Char Ande",[["dudh",1],["ande",4]]],
