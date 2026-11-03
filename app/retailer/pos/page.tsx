@@ -19,6 +19,8 @@ export default function RetailerPOS(){
  const [cart,setCart]=useState<Record<string,number>>({});
  const [voiceDraft,setVoiceDraft]=useState<{id:string;quantity:number}[]>([]);
  const [voiceDraftBusy,setVoiceDraftBusy]=useState(false);
+ const [autoAddVoice,setAutoAddVoice]=useState(false);
+ const autoAddStarted=useRef(false);
  const [holdId,setHoldId]=useState<string|null>(null);
  const [holdExpiry,setHoldExpiry]=useState<string|null>(null);
  const [now,setNow]=useState(Date.now());
@@ -48,7 +50,8 @@ export default function RetailerPOS(){
  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
  useEffect(()=>{if(!store.storeId)return;const timer=window.setInterval(()=>{if(!cartLock.current)void refreshBill();},5000);return()=>window.clearInterval(timer);},[store.storeId,refreshBill]);
  useEffect(()=>{
-  const raw=new URLSearchParams(window.location.search).get("voiceDraft");if(!raw)return;
+  const params=new URLSearchParams(window.location.search);const raw=params.get("voiceDraft");if(!raw)return;
+  setAutoAddVoice(params.get("autoAddVoice")==="1");
   try{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>30)throw Error("Invalid draft");
    const lines=parsed.map((x:unknown)=>{if(!x||typeof x!=="object")throw Error("Invalid line");const row=x as Record<string,unknown>;return {id:String(row.id),quantity:Number(row.quantity)};});
    if(lines.some(x=>!byId.has(x.id)||!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>100)||new Set(lines.map(x=>x.id)).size!==lines.length)throw Error("Invalid product or quantity");
@@ -60,16 +63,21 @@ export default function RetailerPOS(){
   if(!supabase||!store.storeId||voiceDraftBusy||cartLock.current)return;
   setVoiceDraftBusy(true);cartLock.current=true;setError("");
   try{
+   const current=await supabase.rpc("my_pos_bill_hold",{p_store_id:store.storeId});
+   if(current.error)throw current.error;
+   const held=new Map<string,number>(((current.data||[]) as {product_id:string;quantity:number}[]).map(x=>[x.product_id,x.quantity]));
    for(const line of voiceDraft){
-    const target=(cart[line.id]||0)+line.quantity;
+    const target=(held.get(line.id)||0)+line.quantity;
     if(target>100)throw Error("Maximum 100 units per item");
     const result=await supabase.rpc("set_pos_bill_quantity",{p_store_id:store.storeId,p_product_id:line.id,p_quantity:target});
     if(result.error)throw result.error;
+    held.set(line.id,target);
    }
    setVoiceDraft([]);setNotice("Voice items added to the held bill. Verify all items before checkout.");
   }catch(e){setError("Could not add all voice items: "+String(e)+". Check the cart before retrying.");setVoiceDraft([]);}
   finally{await refreshBill();cartLock.current=false;setVoiceDraftBusy(false);}
  };
+ useEffect(()=>{if(!autoAddVoice||!voiceDraft.length||!store.storeId||autoAddStarted.current)return;autoAddStarted.current=true;setAutoAddVoice(false);void addVoiceDraft();},[autoAddVoice,voiceDraft,store.storeId]);
  const available=store.items.filter(i=>i.active&&i.stock>0);
  const matches=available.filter(i=>{const p=byId.get(i.productId);return [p?.name,p?.category,p?.packSize].join(" ").toLowerCase().includes(query.toLowerCase());}).slice(0,60);
  const lines=Object.entries(cart).map(([id,quantity])=>{const i=store.items.find(x=>x.productId===id);return i?{...i,quantity,product:byId.get(id)}:null;}).filter((x):x is NonNullable<typeof x>=>!!x&&x.quantity>0);
