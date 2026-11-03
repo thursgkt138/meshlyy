@@ -8,7 +8,7 @@ export function parseBasket(text:string,stockedNames:string[]):BasketTerm[]{
  const isQty=(w:string)=>/^\d+$/.test(w)||counts[w]!==undefined;
  const terms:BasketTerm[]=[];let buffer:string[]=[];let prefix:number|null=null;
  const flush=(suffix?:number)=>{if(buffer.length){terms.push({term:buffer.join(" "),quantity:suffix??prefix??1});buffer=[];prefix=null;}};
- for(const w of words){if(isQty(w)){const n=counts[w]??Number(w);if(buffer.length)flush(n);else prefix=n;}else buffer.push(w);}
+ for(const w of words){if(isQty(w)){const n=counts[w]??Number(w);if(buffer.length){if(prefix!==null){flush();prefix=n;}else flush(n);}else prefix=n;}else buffer.push(w);}
  flush();
  if(terms.length===1&&words.length>=2&&!words.some(isQty)){
   const filler=new Set(["stock","check","show","find","sell","sold","bech","becha","diya","aaya","available","kitna","hai","the","my"]);
