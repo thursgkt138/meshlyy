@@ -35,6 +35,8 @@ export default function LivePickup(){
  const [now,setNow]=useState(Date.now());
  const lastTrackedSearch=useRef("");
  const [viewed,setViewed]=useState<string|null>(null);
+ const [showReservations,setShowReservations]=useState(false);
+ const [showMobileCart,setShowMobileCart]=useState(false);
  const load=useCallback(async()=>{
    if(!supabase){setMessage("Supabase configuration is missing.");setLoading(false);return;}
    const {data,error}=await supabase.rpc("discover_pickup_products",{p_query:"",p_locality:locality.trim(),p_limit:100});
@@ -186,13 +188,14 @@ export default function LivePickup(){
   <h1 style={{fontSize:"clamp(34px,5vw,58px)",margin:"8px 0"}}>Find it nearby. Pick it up.</h1>
   <p style={{color:"#597b71",lineHeight:1.6}}>Live shop listings from retailer inventory. Reserve at the shop's selling price, then collect in person once accepted.</p>
   <p style={{fontSize:12,color:"#658477"}}>Signed-in searches contribute to aggregated marketplace analytics. Individual search histories are not shown to retailers.</p>
+  <div className="pickup-top-actions">{user&&<button type="button" onClick={()=>setShowReservations(true)}>My orders <span>{orders.filter(o=>o.status==="requested"||o.status==="accepted").length} active</span></button>}<button type="button" className="pickup-basket-shortcut" onClick={()=>setShowMobileCart(true)}>Basket · {cartCount} items</button></div>
   <section style={{display:"flex",gap:10,flexWrap:"wrap",margin:"26px 0"}}><input aria-label="Search products" placeholder="Search products or shops…" style={{...input,flex:"2 1 260px"}} value={query} onChange={e=>setQuery(e.target.value)}/><input aria-label="Locality" placeholder="Filter by locality…" style={{...input,flex:"1 1 180px"}} value={locality} onChange={e=>setLocality(e.target.value)}/><button onClick={()=>void load()} style={button}>Refresh</button></section>
   {message&&<p role="status" style={{background:"#e7f1ea",borderRadius:10,padding:14}}>{message}</p>}
   <section style={{border:"1px solid #d8e6dd",background:"white",padding:20,borderRadius:18,marginBottom:24}}>
     {user?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}><strong>Signed in for pickup requests</strong><button style={{...button,background:"#e7f1ea",color:"#143e38"}} onClick={()=>void supabase?.auth.signOut()}>Sign out</button></div>:<><strong>Customer account</strong><p style={{fontSize:13,color:"#5f7d72"}}>Sign in or register to send a reservation. You can browse without an account.</p><div style={{display:"flex",gap:9,flexWrap:"wrap"}}><input type="email" aria-label="Email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={input}/><input type="password" aria-label="Password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} style={input}/><button disabled={busy} style={button} onClick={()=>void login()}>{register?"Register":"Sign in"}</button><button style={{...button,background:"#e7f1ea",color:"#143e38"}} onClick={()=>setRegister(!register)}>{register?"Have an account?":"New customer?"}</button></div></>}
   </section>
   <aside className="pickup-cart-rail" aria-label="Your pickup basket"><div className="pickup-cart-head"><span><ShoppingBasket size={19}/> Your basket</span><strong>{cartCount} items</strong></div>{!selected.length?<div className="pickup-cart-empty"><ShoppingBasket size={30}/><strong>Your basket is empty</strong><p>Add products to see your pickup order here.</p></div>:<><div className="pickup-cart-scroll">{groups.map(g=><div className="pickup-cart-group" key={g.id}><div className="pickup-cart-store"><Store size={15}/><strong>{g.name}</strong></div>{g.lines.map(l=>{const p=products.get(l.product_id);const photo=imageFor(p);return <div className="pickup-cart-item" key={l.product_id}><div className="pickup-cart-photo">{photo?<img src={photo} alt={p?.name||"Product"}/>:<ShoppingBasket size={18}/>}</div><div className="pickup-cart-info"><strong>{p?.name||l.product_id}</strong><small>{money(l.price)} each</small><div className="pickup-cart-stepper"><button aria-label="Decrease quantity" disabled={cartBusy||busy} onClick={()=>void change(l,-1)}><Minus size={14}/></button><span>{l.quantity}</span><button aria-label="Increase quantity" disabled={cartBusy||busy||l.quantity>=20} onClick={()=>void change(l,1)}><Plus size={14}/></button></div></div><strong className="pickup-cart-price">{money(l.price*l.quantity)}</strong></div>;})}<div className="pickup-cart-group-footer"><span>{g.lines.reduce((n,l)=>n+l.quantity,0)} items · {money(g.lines.reduce((n,l)=>n+l.price*l.quantity,0))}</span><button disabled={busy||cartBusy||!holds.some(h=>h.store_id===g.id&&new Date(h.expires_at).getTime()>now)} onClick={()=>void reserve(g)}>Request pickup <ArrowRight size={15}/></button></div></div>)}</div><div className="pickup-cart-total"><span>Total across stores</span><strong>{money(cartTotal)}</strong></div><p className="pickup-cart-note">Holds last 60 seconds · Pickup only · Pay at shop.</p></>}</aside>
-  {cartCount>0&&<a className="pickup-mobile-cart" href="#pickup-baskets"><ShoppingBasket size={19}/><span><strong>{cartCount} items · {money(cartTotal)}</strong><small>View basket & request pickup</small></span><ArrowRight size={19}/></a>}
+  {cartCount>0&&<button type="button" className="pickup-mobile-cart" onClick={()=>setShowMobileCart(true)}><ShoppingBasket size={19}/><span><strong>{cartCount} items · {money(cartTotal)}</strong><small>View basket & request pickup</small></span><ArrowRight size={19}/></button>}
   <div className="pickup-products-area"><h2>Available near you <span style={{fontSize:14,fontWeight:400,color:"#688277"}}>({filtered.length} listings)</span></h2>
   {loading?<p>Loading inventory…</p>:!filtered.length?<p>No matching in-stock products. Try another locality or search.</p>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,225px),1fr))",gap:16}}>
     {filtered.map(l=>{const p=products.get(l.product_id);const image=imageFor(p);const qty=basket[l.store_id+":"+l.product_id]||0;return <article key={l.store_id+":"+l.product_id} style={{border:"1px solid #dce9e2",borderRadius:20,padding:14,background:"white",display:"flex",flexDirection:"column",minWidth:0,overflow:"hidden",gap:0}}>
@@ -205,58 +208,7 @@ export default function LivePickup(){
   </div>}
   </div>
   {viewed&&(()=>{const listing=listings.find(l=>l.store_id+":"+l.product_id===viewed);if(!listing)return null;const p=products.get(listing.product_id);return <div role="dialog" aria-modal="true" aria-label="Product details" style={{position:"fixed",inset:0,zIndex:100,background:"rgba(16,43,37,.75)",display:"grid",placeItems:"center",padding:20}}><section style={{background:"white",padding:25,borderRadius:20,maxWidth:440,width:"100%"}}><button onClick={()=>setViewed(null)} style={{float:"right",border:0,background:"transparent",cursor:"pointer"}} aria-label="Close details">Close</button><h2 style={{marginTop:8}}>{p?.name||listing.product_id}</h2><p>{p?.category} · {p?.packSize}</p><p>{listing.store_name} · {listing.locality||"Local shop"}</p><strong style={{fontSize:24}}>{money(listing.price)}</strong><p>{listing.stock} units available</p><button style={button} disabled={cartBusy||busy} onClick={()=>{void change(listing,1);setViewed(null);}}>Add to pickup basket</button></section></div>;})()}
-  <section id="pickup-baskets" style={{marginTop:48,scrollMarginTop:30}}>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",gap:16,flexWrap:"wrap",marginBottom:22}}>
-      <div><p style={{letterSpacing:2,fontSize:11,fontWeight:700,color:"#41806e",margin:"0 0 8px"}}>YOUR NEIGHBOURHOOD ORDER</p><h2 style={{fontSize:"clamp(28px,3vw,38px)",margin:"0 0 8px"}}>Your pickup baskets <span style={{fontSize:17,fontWeight:400,color:"#729087"}}>({selected.reduce((n,x)=>n+x.quantity,0)} items)</span></h2><p style={{color:"#66847a",fontSize:14,margin:0}}>One pickup request per shop. You only visit after the shop accepts.</p></div>
-      <span style={{background:"#e5f4ed",color:"#17664f",padding:"9px 13px",borderRadius:99,fontWeight:700,fontSize:12}}>● Pickup only · No delivery</span>
-    </div>
-    {!groups.length?<div style={{border:"1px solid #d9e8e0",borderRadius:18,padding:"40px 25px",background:"white",textAlign:"center"}}><div style={{fontSize:32,marginBottom:10}}>◈</div><strong style={{fontSize:20}}>Your basket is waiting for something good.</strong><p style={{color:"#67877d"}}>Browse nearby products and add your favourites.</p><a href="#" style={{color:"#116b57",fontWeight:700}}>Explore products ↑</a></div>:groups.map(g=>{
-      const total=g.lines.reduce((sum,l)=>sum+Number(l.price)*l.quantity,0);
-      const count=g.lines.reduce((sum,l)=>sum+l.quantity,0);
-      const localityName=g.lines[0]?.locality;
-      return <div key={g.id} style={{marginBottom:24,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,340px),1fr))",gap:18,alignItems:"start"}}>
-        <div style={{background:"white",border:"1px solid #d9e8e0",borderRadius:20,overflow:"hidden",minWidth:0}}>
-          <div style={{padding:"20px 22px",borderBottom:"1px solid #e7efea",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-            <div><div style={{fontSize:11,letterSpacing:1.5,color:"#568579",fontWeight:700,marginBottom:6}}>PICKUP FROM</div><strong style={{fontSize:21}}>{g.name}</strong>{localityName&&<div style={{fontSize:13,color:"#708b80",marginTop:4}}>{localityName}</div>}</div>
-            <span style={{fontSize:12,color:"#2c715e",background:"#ecf6ef",padding:"8px 11px",borderRadius:99}}>{count} {count===1?"item":"items"}</span>
-          </div>
-          {g.lines.map((l,index)=>{const p=products.get(l.product_id);const photo=imageFor(p);return <div key={l.product_id} style={{display:"flex",gap:16,padding:"20px 22px",borderBottom:index===g.lines.length-1?"none":"1px solid #edf2ee",alignItems:"start"}}>
-            <div style={{width:96,height:100,flex:"0 0 96px",borderRadius:13,background:"#f0f6f1",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
-              {photo?<img src={photo} alt={p?.name||"Product"} loading="lazy" referrerPolicy="no-referrer" style={{display:"block",width:"100%",height:"100%",objectFit:"contain",padding:8,boxSizing:"border-box"}}/>:<span style={{fontSize:11,color:"#729185",textAlign:"center"}}>Image unavailable</span>}
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <strong style={{fontSize:15,lineHeight:1.45,display:"block",overflowWrap:"anywhere"}}>{p?.name||l.product_id}</strong>
-              <p style={{fontSize:12,color:"#729085",margin:"5px 0 10px"}}>{p?.packSize||p?.category||"Product"}</p>
-              <strong style={{fontSize:18}}>{money(l.price)}</strong><span style={{fontSize:12,color:"#779187",marginLeft:7}}>each</span>
-              <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginTop:12}}>
-                <div style={{display:"inline-flex",alignItems:"center",border:"1px solid #c9ded3",borderRadius:10,overflow:"hidden"}}>
-                  <button aria-label={"Decrease quantity of "+(p?.name||l.product_id)} disabled={cartBusy||busy} onClick={()=>void change(l,-1)} style={{border:0,background:"#f2f8f3",padding:"8px 13px",cursor:"pointer",fontWeight:700,color:"#145745"}}>−</button>
-                  <span style={{minWidth:32,textAlign:"center",fontWeight:700,fontSize:13}}>{l.quantity}</span>
-                  <button aria-label={"Increase quantity of "+(p?.name||l.product_id)} disabled={cartBusy||busy||l.quantity>=20} onClick={()=>void change(l,1)} style={{border:0,background:"#f2f8f3",padding:"8px 13px",cursor:"pointer",fontWeight:700,color:"#145745",opacity:l.quantity>=20?.4:1}}>+</button>
-                </div>
-                <button disabled={cartBusy||busy} onClick={()=>void change(l,0,true)} style={{border:0,background:"none",color:"#6d857b",fontSize:12,textDecoration:"underline",cursor:"pointer"}}>Remove</button>
-              </div>
-            </div>
-            <strong style={{fontSize:16,whiteSpace:"nowrap"}}>{money(l.price*l.quantity)}</strong>
-          </div>;})}
-          <div style={{padding:"14px 22px",background:"#fafcf9",fontSize:12,color:"#6b877b"}}>✓ Stock held for 60 seconds after adding to cart · {(()=>{const h=holds.find(x=>x.store_id===g.id);const seconds=h?Math.max(0,Math.ceil((new Date(h.expires_at).getTime()-now)/1000)):0;return seconds>0?"Confirm within "+seconds+"s":"Hold expired — remove and re-add items";})()}</div>
-        </div>
-        <aside style={{background:"white",border:"1px solid #d9e8e0",borderRadius:20,padding:24,boxShadow:"0 10px 28px rgba(20,65,50,.04)"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:20}}><h3 style={{fontSize:21,margin:0}}>Order summary</h3><span style={{fontSize:12,color:"#628378"}}>{count} items</span></div>
-          <div style={{display:"grid",gap:13,fontSize:14}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#6a867b"}}>Items subtotal</span><strong>{money(total)}</strong></div>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#6a867b"}}>Pickup</span><strong style={{color:"#167253"}}>Free</strong></div>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#6a867b"}}>Online payment</span><span>Not required</span></div>
-          </div>
-          <div style={{borderTop:"1px dashed #cfdfd5",margin:"21px 0",paddingTop:18,display:"flex",justifyContent:"space-between",alignItems:"center"}}><strong style={{fontSize:16}}>Estimated total</strong><strong style={{fontSize:28}}>{money(total)}</strong></div>
-          <button disabled={busy||cartBusy||!holds.some(h=>h.store_id===g.id&&new Date(h.expires_at).getTime()>now)} onClick={()=>void reserve(g)} style={{...button,width:"100%",fontSize:15,padding:"16px 12px",opacity:(busy||cartBusy)?.6:1}}>{busy?"Sending request…":"Request pickup →"}</button>
-          <p style={{fontSize:12,color:"#69877b",lineHeight:1.6,margin:"14px 0 0",textAlign:"center"}}>Pay at the shop. Your reservation is pending until the retailer accepts it.</p>
-          <div style={{background:"#f1f7f2",borderRadius:12,padding:"13px 15px",marginTop:20}}><strong style={{fontSize:13}}>How pickup works</strong><div style={{fontSize:12,color:"#55776a",lineHeight:1.8,marginTop:6}}>1. Send your request<br />2. Shop confirms availability<br />3. Collect during your pickup window</div></div>
-        </aside>
-      </div>;
-    })}
-  </section>
-  {user&&<section style={{marginTop:50}}>
+  {showReservations&&<div className="pickup-drawer-overlay" onClick={()=>setShowReservations(false)}><div className="pickup-drawer pickup-orders-drawer" role="dialog" aria-modal="true" aria-label="Your reservations" onClick={e=>e.stopPropagation()}><div className="pickup-drawer-top"><strong>My pickup orders</strong><button type="button" onClick={()=>setShowReservations(false)}>Close ×</button></div>  {user&&<section className="pickup-reservations-panel">
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",marginBottom:20}}>
       <div><p style={{letterSpacing:2,fontSize:11,fontWeight:700,color:"#41806e",margin:"0 0 7px"}}>YOUR ORDER JOURNEY</p><h2 style={{fontSize:"clamp(28px,3vw,38px)",margin:0}}>Your reservations <span style={{fontSize:16,color:"#759187",fontWeight:400}}>({orders.length})</span></h2></div>
       <button style={{...button,background:"#e6f0e9",color:"#143e38"}} onClick={()=>void loadOrders()}>↻ Refresh status</button>
@@ -302,6 +254,8 @@ export default function LivePickup(){
       })}
     </div>}
   </section>}
-  <p style={{marginTop:30,fontSize:12,color:"#6e877d"}}>Internal test preview. Source images require publication rights. No delivery, online payment or pickup OTP verification is enabled.</p>
+</div></div>}
+  {showMobileCart&&<div className="pickup-drawer-overlay" onClick={()=>setShowMobileCart(false)}><div className="pickup-drawer pickup-mobile-drawer" role="dialog" aria-modal="true" aria-label="Your basket" onClick={e=>e.stopPropagation()}><div className="pickup-drawer-top"><strong>Your pickup basket</strong><button type="button" onClick={()=>setShowMobileCart(false)}>Close ×</button></div><div className="pickup-mobile-cart-content">{groups.map(g=><div className="pickup-mobile-group" key={g.id}><h3>{g.name}</h3>{g.lines.map(l=>{const p=products.get(l.product_id);return <div className="pickup-mobile-line" key={l.product_id}><span>{p?.name||l.product_id}</span><div><button disabled={cartBusy||busy} onClick={()=>void change(l,-1)}>−</button><strong>{l.quantity}</strong><button disabled={cartBusy||busy} onClick={()=>void change(l,1)}>+</button></div><strong>{money(l.price*l.quantity)}</strong></div>;})}<button className="pickup-mobile-checkout" disabled={busy||cartBusy||!holds.some(h=>h.store_id===g.id&&new Date(h.expires_at).getTime()>now)} onClick={()=>void reserve(g)}>Request pickup · {money(g.lines.reduce((n,l)=>n+l.price*l.quantity,0))}</button></div>)}</div></div></div>}
+
  </main>;
 }
