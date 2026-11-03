@@ -1,0 +1,24 @@
+/* Shared retailer interior polish. Scoped to logged-in pages; POS keeps its own design. */
+.ret-page-content > main:not(.pos-studio){background:#f8faf9!important;color:#1d352a!important;font-family:var(--sans,"DM Sans",Arial,sans-serif)!important;min-height:calc(100vh - 70px)!important;max-width:1510px!important;margin:0 auto!important;padding:32px 34px 75px!important}
+.ret-page-content > main:not(.pos-studio) h1{font-size:clamp(29px,3vw,39px)!important;line-height:1.2!important;letter-spacing:-1.5px!important;font-weight:750!important;margin-top:8px!important;margin-bottom:10px!important}
+.ret-page-content > main:not(.pos-studio) h2{font-size:19px!important;letter-spacing:-.5px!important;line-height:1.3!important;font-weight:750!important}
+.ret-page-content > main:not(.pos-studio) p{line-height:1.65}
+.ret-page-content > main:not(.pos-studio) section[style*="background"],.ret-page-content > main:not(.pos-studio) article[style*="background"]{border-color:#e6ede8!important;box-shadow:0 4px 18px #1c423006}
+.ret-page-content > main:not(.pos-studio) section[style*="background: white"],.ret-page-content > main:not(.pos-studio) section[style*="background: rgb(255"]{border-radius:16px!important}
+.ret-page-content > main:not(.pos-studio) input:not([type=checkbox]),.ret-page-content > main:not(.pos-studio) select,.ret-page-content > main:not(.pos-studio) textarea{font:inherit;font-size:13px!important;border-color:#e0eae3!important;border-radius:10px!important;transition:border-color .15s,box-shadow .15s}
+.ret-page-content > main:not(.pos-studio) input:focus-visible,.ret-page-content > main:not(.pos-studio) select:focus-visible,.ret-page-content > main:not(.pos-studio) textarea:focus-visible{outline:2px solid #86bca0!important;outline-offset:1px}
+.ret-page-content > main:not(.pos-studio) button{font-family:inherit;transition:filter .15s,transform .15s;cursor:pointer}
+.ret-page-content > main:not(.pos-studio) button:hover:not(:disabled){filter:brightness(.96)}
+.ret-page-content > main:not(.pos-studio) button:disabled{opacity:.5;cursor:not-allowed}
+.ret-page-content > main:not(.pos-studio) button:focus-visible,.ret-page-content > main:not(.pos-studio) a:focus-visible{outline:2px solid #4a9770;outline-offset:3px}
+.ret-page-content > main:not(.pos-studio) a{transition:color .15s}
+.ret-page-content > main:not(.pos-studio) small{line-height:1.5}
+.ret-page-content > main:not(.pos-studio) img{object-fit:contain}
+.ret-page-content > main:not(.pos-studio) [role=alert]{border-radius:11px;padding:12px 15px;background:#fff0eb;color:#a14431!important}
+.ret-page-content > main:not(.pos-studio) [role=status]{border-radius:10px}
+.ret-page-content > main:not(.pos-studio) [style*="letter-spacing: 2"],.ret-page-content > main:not(.pos-studio) [style*="letter-spacing:2"]{letter-spacing:1.3px!important}
+.ret-page-content > main:not(.pos-studio) [style*="border-radius: 22"],.ret-page-content > main:not(.pos-studio) [style*="border-radius:22"]{border-radius:17px!important}
+.ret-page-content > main:not(.pos-studio) [style*="border-radius: 18"],.ret-page-content > main:not(.pos-studio) [style*="border-radius:18"]{border-radius:15px!important}
+.ret-page-content > main:not(.pos-studio) [style*="border-bottom"]{border-bottom-color:#edf2ee!important}
+@media(max-width:850px){.ret-page-content > main:not(.pos-studio){padding:22px 15px 95px!important}}
+@media print{.ret-page-content > main:not(.pos-studio){background:white!important;padding:0!important;min-height:0!important}}
