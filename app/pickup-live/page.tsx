@@ -50,6 +50,32 @@ export default function LivePickup(){
    else setOrderLines((details.data||[]) as ReservationLine[]);
  },[user]);
  useEffect(()=>{void load();},[load]);
+ // Consumer inventory invalidation: realtime events plus a bounded fallback poll.
+ // Refetch the authoritative discovery RPC rather than trusting event payloads.
+ useEffect(()=>{
+  if(!supabase)return;
+  const client=supabase;
+  let pending=false;
+  const refresh=()=>{
+   if(pending||document.visibilityState!=="visible")return;
+   pending=true;
+   void load().finally(()=>{pending=false;});
+  };
+  const channel=client.channel("consumer-live-inventory")
+   .on("postgres_changes",{event:"*",schema:"public",table:"store_inventory"},refresh)
+   .subscribe();
+  const onFocus=()=>refresh();
+  const onVisibility=()=>{if(document.visibilityState==="visible")refresh();};
+  window.addEventListener("focus",onFocus);
+  document.addEventListener("visibilitychange",onVisibility);
+  const timer=window.setInterval(refresh,10000);
+  return()=>{
+   window.clearInterval(timer);
+   window.removeEventListener("focus",onFocus);
+   document.removeEventListener("visibilitychange",onVisibility);
+   void client.removeChannel(channel);
+  };
+ },[load]);
  useEffect(()=>{
    if(!supabase)return;
    supabase.auth.getUser().then(({data})=>setUser(data.user?.id||null));
