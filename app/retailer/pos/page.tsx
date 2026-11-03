@@ -1,4 +1,5 @@
 "use client";
+import {decodePosDraft} from "../assistant/pos-draft";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
 import {Search,X,Plus,Minus,Package,AlertTriangle,ReceiptText,IndianRupee,Clock3,ShoppingBasket,Trash2,Smartphone,Banknote,CreditCard,Wallet,ArrowRight,ArrowUpRight,ShieldCheck} from "lucide-react";
@@ -52,9 +53,7 @@ export default function RetailerPOS(){
  useEffect(()=>{
   const params=new URLSearchParams(window.location.search);const raw=params.get("voiceDraft");if(!raw)return;
   setAutoAddVoice(params.get("autoAddVoice")==="1");
-  try{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>30)throw Error("Invalid draft");
-   const lines=parsed.map((x:unknown)=>{if(!x||typeof x!=="object")throw Error("Invalid line");const row=x as Record<string,unknown>;return {id:String(row.id),quantity:Number(row.quantity)};});
-   if(lines.some(x=>!byId.has(x.id)||!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>100)||new Set(lines.map(x=>x.id)).size!==lines.length)throw Error("Invalid product or quantity");
+  try{const lines=decodePosDraft(raw,new Set(byId.keys()));
    setVoiceDraft(lines);
   }catch{setError("Voice draft was invalid. Please create the bill manually.");}
   window.history.replaceState(null,"",window.location.pathname);
