@@ -1,6 +1,8 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
+import "./pickup-live.css";
+import {ShoppingBasket,Plus,Minus,ArrowRight,Store} from "lucide-react";
 import catalog from "../../meshlyy-master-catalog.json";
 import images from "../../meshlyy-source-image-references.json";
 import {supabase} from "../retailer/catalog/use-retailer-store";
@@ -27,6 +29,7 @@ export default function LivePickup(){
  const [orders,setOrders]=useState<Reservation[]>([]);
  const [orderLines,setOrderLines]=useState<ReservationLine[]>([]);
  const [pickupCodes,setPickupCodes]=useState<Record<string,string>>({});
+ const [cancelReasons,setCancelReasons]=useState<Record<string,string>>({});
  const [codeBusy,setCodeBusy]=useState<string|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const [now,setNow]=useState(Date.now());
@@ -44,6 +47,7 @@ export default function LivePickup(){
    if(error){setMessage(error.message);return;}
    const rows=(data||[]) as Reservation[];
    setOrders(rows);
+   void supabase.rpc("my_pickup_cancellation_reasons").then(({data,error:reasonError})=>{if(reasonError)return;const next:Record<string,string>={};for(const entry of (data||[]) as {reservation_id:string;reason:string}[])next[entry.reservation_id]=entry.reason;setCancelReasons(next);});
    if(!rows.length){setOrderLines([]);return;}
    const details=await supabase.from("pickup_reservation_items").select("reservation_id,product_id,quantity,price_at_request").in("reservation_id",rows.map(o=>o.id));
    if(details.error)setMessage(details.error.message);
@@ -174,7 +178,9 @@ export default function LivePickup(){
    for(const item of group.lines)track(item,"pickup_requested");
    await loadHolds();await loadOrders();await load();
  };
- return <main style={{background:"#f7faf7",minHeight:"100vh",fontFamily:"Arial,sans-serif",color:"#112f2e",padding:"28px max(20px,calc((100vw - 1200px)/2))"}}>
+ const cartCount=selected.reduce((sum,l)=>sum+l.quantity,0);
+ const cartTotal=selected.reduce((sum,l)=>sum+l.quantity*Number(l.price),0);
+ return <main className="pickup-shop" style={{background:"#f7faf7",minHeight:"100vh",fontFamily:"Arial,sans-serif",color:"#112f2e",padding:"28px max(20px,calc((100vw - 1200px)/2))"}}>
   <nav style={{display:"flex",justifyContent:"space-between",gap:15,flexWrap:"wrap"}}><Link href="/" style={{color:"#116d5a",fontWeight:700,textDecoration:"none"}}>◈ meshlyy home</Link><Link href="/retailer/dashboard" style={{color:"#116d5a"}}>Retailer studio</Link></nav>
   <p style={{letterSpacing:3,fontSize:12,color:"#53877a",marginTop:38}}>MESHLYY / NEIGHBOURHOOD PICKUP</p>
   <h1 style={{fontSize:"clamp(34px,5vw,58px)",margin:"8px 0"}}>Find it nearby. Pick it up.</h1>
@@ -185,7 +191,9 @@ export default function LivePickup(){
   <section style={{border:"1px solid #d8e6dd",background:"white",padding:20,borderRadius:18,marginBottom:24}}>
     {user?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}><strong>Signed in for pickup requests</strong><button style={{...button,background:"#e7f1ea",color:"#143e38"}} onClick={()=>void supabase?.auth.signOut()}>Sign out</button></div>:<><strong>Customer account</strong><p style={{fontSize:13,color:"#5f7d72"}}>Sign in or register to send a reservation. You can browse without an account.</p><div style={{display:"flex",gap:9,flexWrap:"wrap"}}><input type="email" aria-label="Email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={input}/><input type="password" aria-label="Password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} style={input}/><button disabled={busy} style={button} onClick={()=>void login()}>{register?"Register":"Sign in"}</button><button style={{...button,background:"#e7f1ea",color:"#143e38"}} onClick={()=>setRegister(!register)}>{register?"Have an account?":"New customer?"}</button></div></>}
   </section>
-  <h2>Available near you <span style={{fontSize:14,fontWeight:400,color:"#688277"}}>({filtered.length} listings)</span></h2>
+  <aside className="pickup-cart-rail" aria-label="Your pickup basket"><div className="pickup-cart-head"><span><ShoppingBasket size={19}/> Your basket</span><strong>{cartCount} items</strong></div>{!selected.length?<div className="pickup-cart-empty"><ShoppingBasket size={30}/><strong>Your basket is empty</strong><p>Add products to see your pickup order here.</p></div>:<><div className="pickup-cart-scroll">{groups.map(g=><div className="pickup-cart-group" key={g.id}><div className="pickup-cart-store"><Store size={15}/><strong>{g.name}</strong></div>{g.lines.map(l=>{const p=products.get(l.product_id);const photo=imageFor(p);return <div className="pickup-cart-item" key={l.product_id}><div className="pickup-cart-photo">{photo?<img src={photo} alt={p?.name||"Product"}/>:<ShoppingBasket size={18}/>}</div><div className="pickup-cart-info"><strong>{p?.name||l.product_id}</strong><small>{money(l.price)} each</small><div className="pickup-cart-stepper"><button aria-label="Decrease quantity" disabled={cartBusy||busy} onClick={()=>void change(l,-1)}><Minus size={14}/></button><span>{l.quantity}</span><button aria-label="Increase quantity" disabled={cartBusy||busy||l.quantity>=20} onClick={()=>void change(l,1)}><Plus size={14}/></button></div></div><strong className="pickup-cart-price">{money(l.price*l.quantity)}</strong></div>;})}<div className="pickup-cart-group-footer"><span>{g.lines.reduce((n,l)=>n+l.quantity,0)} items · {money(g.lines.reduce((n,l)=>n+l.price*l.quantity,0))}</span><button disabled={busy||cartBusy||!holds.some(h=>h.store_id===g.id&&new Date(h.expires_at).getTime()>now)} onClick={()=>void reserve(g)}>Request pickup <ArrowRight size={15}/></button></div></div>)}</div><div className="pickup-cart-total"><span>Total across stores</span><strong>{money(cartTotal)}</strong></div><p className="pickup-cart-note">Holds last 60 seconds · Pickup only · Pay at shop.</p></>}</aside>
+  {cartCount>0&&<a className="pickup-mobile-cart" href="#pickup-baskets"><ShoppingBasket size={19}/><span><strong>{cartCount} items · {money(cartTotal)}</strong><small>View basket & request pickup</small></span><ArrowRight size={19}/></a>}
+  <div className="pickup-products-area"><h2>Available near you <span style={{fontSize:14,fontWeight:400,color:"#688277"}}>({filtered.length} listings)</span></h2>
   {loading?<p>Loading inventory…</p>:!filtered.length?<p>No matching in-stock products. Try another locality or search.</p>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,225px),1fr))",gap:16}}>
     {filtered.map(l=>{const p=products.get(l.product_id);const image=imageFor(p);const qty=basket[l.store_id+":"+l.product_id]||0;return <article key={l.store_id+":"+l.product_id} style={{border:"1px solid #dce9e2",borderRadius:20,padding:14,background:"white",display:"flex",flexDirection:"column",minWidth:0,overflow:"hidden",gap:0}}>
       <div style={{height:210,width:"100%",background:"#eef5f0",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,position:"relative"}}>{image?<img src={image} alt={p?.name||"Product"} referrerPolicy="no-referrer" loading="lazy" style={{display:"block",width:"100%",height:"100%",maxWidth:"100%",maxHeight:"100%",objectFit:"contain",objectPosition:"center",padding:12,boxSizing:"border-box",flex:"none"}}/>:<span style={{fontSize:12,color:"#6d8d80"}}>Image unavailable</span>}</div>
@@ -195,6 +203,7 @@ export default function LivePickup(){
       {qty?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={button} disabled={cartBusy||busy} onClick={()=>void change(l,-1)}>−</button><strong>{qty}</strong><button style={button} disabled={cartBusy||busy} onClick={()=>void change(l,1)}>+</button></div>:<button style={button} disabled={cartBusy||busy||!user} onClick={()=>void change(l,1)}>+ Add to basket</button>}
     </article>;})}
   </div>}
+  </div>
   {viewed&&(()=>{const listing=listings.find(l=>l.store_id+":"+l.product_id===viewed);if(!listing)return null;const p=products.get(listing.product_id);return <div role="dialog" aria-modal="true" aria-label="Product details" style={{position:"fixed",inset:0,zIndex:100,background:"rgba(16,43,37,.75)",display:"grid",placeItems:"center",padding:20}}><section style={{background:"white",padding:25,borderRadius:20,maxWidth:440,width:"100%"}}><button onClick={()=>setViewed(null)} style={{float:"right",border:0,background:"transparent",cursor:"pointer"}} aria-label="Close details">Close</button><h2 style={{marginTop:8}}>{p?.name||listing.product_id}</h2><p>{p?.category} · {p?.packSize}</p><p>{listing.store_name} · {listing.locality||"Local shop"}</p><strong style={{fontSize:24}}>{money(listing.price)}</strong><p>{listing.stock} units available</p><button style={button} disabled={cartBusy||busy} onClick={()=>{void change(listing,1);setViewed(null);}}>Add to pickup basket</button></section></div>;})()}
   <section id="pickup-baskets" style={{marginTop:48,scrollMarginTop:30}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",gap:16,flexWrap:"wrap",marginBottom:22}}>
