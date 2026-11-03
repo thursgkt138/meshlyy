@@ -21,6 +21,31 @@ export default function RetailAssistant(){
  const indexed=useMemo(()=>store.items.map(i=>({...i,name:byId.get(i.productId)?.name||i.productId})),[store.items]);
  const run=(raw:string)=>{
   const q=norm(raw);setHeard(raw);setError("");if(!q)return;
+  const saleIntent=/bech|becha|bechi|bech diya|sold|sell|sale|बेच|बिका|बेचा|बिक्री/.test(q);
+  const receiveIntent=/aaya|aayi|received|restock|stock aaya|आया|आई|मिला|जमा/.test(q);
+  const unitLine=/(\\d+(?:\\.\\d+)?|aadha|adha|half|sawa|dhai|pauna|आधा|सवा|ढाई)\\s*(kilo|kg|kilogram|gram|g|packet|packets|pack|piece|pieces|pcs|litre|liter|l|ml|किलो|ग्राम|पैकेट|पीस)?\\s+([^,;]+?)(?=\\s+(?:aur|and|और)\\s+\\d|[,;]|$)/giu;
+  const parts=[...raw.matchAll(unitLine)].map(m=>{
+   const words:Record<string,number>={aadha:.5,adha:.5,half:.5,sawa:1.25,dhai:2.5,pauna:.75,"आधा":.5,"सवा":1.25,"ढाई":2.5};
+   const amount=words[m[1].toLowerCase()]??Number(m[1]);
+   const unit=(m[2]||"piece").toLowerCase();
+   const phrase=norm(m[3].replace(/\\b(bech diya|becha|bechi|sold|sell|aaya|aayi|received|stock|add|aur|and)\\b/gi,""));
+   const ranked=indexed.map(i=>({i,score:norm(i.name).split(" ").filter(t=>t.length>2&&phrase.includes(t)).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+   return {amount,unit,ranked};
+  }).filter(p=>p.amount>0&&p.ranked.length>0);
+  if((saleIntent||receiveIntent||parts.length>1)&&parts.length){
+   const unresolved=parts.some(p=>p.ranked.length>1&&p.ranked[0].score===p.ranked[1].score);
+   const fractional=parts.some(p=>!Number.isInteger(p.amount)||/kg|kilo|gram|litre|liter|ml|किलो|ग्राम/.test(p.unit));
+   const description=parts.map(p=>`${p.amount} ${p.unit} — ${p.ranked[0].i.name}`).join("; ");
+   if(unresolved){setAnswer({title:"Choose the exact product variant",detail:"Multiple stocked SKUs match this speech. Please specify the brand and pack size before preparing a transaction.",items:parts.flatMap(p=>p.ranked.slice(0,4).map(x=>({id:x.i.productId,name:x.i.name,stock:x.i.stock})))});return;}
+   if(fractional){setAnswer({title:"Measured quantity detected",detail:description,warning:"This store still uses integer-based POS holds. Decimal/weight transactions are not enabled until the unit-aware database migration is applied; no stock was changed."});return;}
+   if(receiveIntent&&!saleIntent&&parts.length===1){const p=parts[0];setAnswer({title:"Restock draft",detail:description,link:`/retailer/stock?product=${encodeURIComponent(p.ranked[0].i.productId)}&direction=add&quantity=${p.amount}`,linkText:"Review and confirm restock",warning:"Stock remains unchanged until confirmed."});return;}
+   if(saleIntent||parts.length>1){
+    const lines=parts.map(p=>({id:p.ranked[0].i.productId,quantity:p.amount}));
+    if(lines.some(l=>l.quantity>100)){setAnswer({title:"Quantity too large",detail:"POS currently limits each product to 100 units.",warning:"No stock was changed."});return;}
+    const encoded=encodeURIComponent(JSON.stringify(lines));
+    setAnswer({title:"Voice checkout draft",detail:description,link:`/retailer/pos?voiceDraft=${encoded}`,linkText:"Review items in POS",warning:"No sale has been completed. Review the items and confirm checkout in POS."});return;
+   }
+  }
   if(/low stock|running low|कम स्टॉक|कम माल|कम सामान/.test(q)){
    const items=indexed.filter(i=>i.stock>0&&i.stock<=5).sort((a,b)=>a.stock-b.stock).slice(0,20);
    setAnswer({title:items.length?`${items.length} low-stock products`:"No low-stock products found",detail:"Showing products with 1–5 available units. This is current available stock, not a demand forecast.",items:items.map(i=>({id:i.productId,name:i.name,stock:i.stock})),link:"/retailer/stock",linkText:"Open inventory"});return;
