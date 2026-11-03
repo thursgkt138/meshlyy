@@ -21,13 +21,13 @@ test("unauthenticated POS does not expose checkout for forged draft",async({page
  const draft=encodeURIComponent(JSON.stringify([{id:"not-in-catalog",quantity:2}]));
  await page.goto("/retailer/pos?voiceDraft="+draft);
  await expect(page.getByRole("heading",{name:/Sell in store/})).toBeVisible();
- await expect(page.getByText("Sign in at")).toBeVisible();
+ await expect(page.locator(".pos-message")).toContainText("Sign in at");
  await expect(page.getByRole("button",{name:/Complete sale/})).toHaveCount(0);
- await expect(page).toHaveURL(/\\/retailer\\/pos$/);
+ await expect(page).toHaveURL("http://127.0.0.1:3100/retailer/pos");
 });
 test("unauthenticated POS does not expose checkout for fractional draft",async({page})=>{
  const draft=encodeURIComponent(JSON.stringify([{id:"not-in-catalog",quantity:1.5}]));
  await page.goto("/retailer/pos?voiceDraft="+draft);
- await expect(page.getByText("Sign in at")).toBeVisible();
+ await expect(page.locator(".pos-message")).toContainText("Sign in at");
  await expect(page.getByRole("button",{name:/Complete sale/})).toHaveCount(0);
 });
