@@ -26,7 +26,7 @@ export default function RetailAssistant(){
   const uncertainIntent=/bhej|bheja|bheji|भेज/.test(q);
   const receiveIntent=/aaya|aayi|received|restock|stock aaya|आया|आई|मिला|जमा/.test(q);
   const unitLine=/(\d+(?:\.\d+)?|aadha|adha|half|sawa|dhai|pauna|आधा|सवा|ढाई)\s*(kilo|kg|kilogram|gram|g|packet|packets|pack|piece|pieces|pcs|litre|liter|l|ml|किलो|ग्राम|पैकेट|पीस)?\s+([^,;]+?)(?=\s+(?:aur|and|और)\s+\d|[,;]|$)/giu;
-  const alias=(v:string)=>{const groups=[["onion","onions","pyaaz","pyaz","pyaj","piyaz","प्याज","प्याज़"],["potato","potatoes","aloo","alu","aaloo","आलू"],["tomato","tomatoes","tamatar","टमाटर"],["milk","doodh","dudh","दूध"],["sugar","cheeni","chini","चीनी"],["rice","chawal","चावल"]];return groups.find(g=>g.includes(v))?.[0]||v;};
+  const alias=(v:string)=>{const groups=[["onion","onions","pyaaz","pyaz","pyaj","piyaz","प्याज","प्याज़"],["potato","potatoes","aloo","alu","aaloo","आलू"],["tomato","tomatoes","tamatar","टमाटर"],["milk","doodh","dudh","दूध"],["sugar","cheeni","chini","चीनी"],["rice","chawal","चावल","akki"],["coriander","dhaniya","dhania","धनिया","kottambari"],["curd","dahi","दही","mosaru"],["ginger","adrak","अदरक","shunti"],["garlic","lahsun","लहसुन","bellulli"],["banana","kela","केला","baale"]];return groups.find(g=>g.includes(v))?.[0]||v;};
   const tokens=(v:string)=>norm(v).split(" ").filter(Boolean).map(alias);
   const parts=[...raw.matchAll(unitLine)].map(m=>{
    const words:Record<string,number>={aadha:.5,adha:.5,half:.5,sawa:1.25,dhai:2.5,pauna:.75,"आधा":.5,"सवा":1.25,"ढाई":2.5};
