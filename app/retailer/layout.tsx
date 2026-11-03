@@ -1,7 +1,7 @@
 "use client";
 import {useState} from "react";
 import "./retailer-interiors.css";
-import {LayoutDashboard,ClipboardList,ShoppingCart,PackageSearch,Boxes,ChartNoAxesCombined,Store,Settings2,CircleHelp} from "lucide-react";
+import {LayoutDashboard,ClipboardList,ShoppingCart,PackageSearch,Boxes,ChartNoAxesCombined,Store,Settings2,CircleHelp,Sparkles} from "lucide-react";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useRetailerStore,supabase} from "./catalog/use-retailer-store";
@@ -17,11 +17,12 @@ function NavIcon({name}:{name:string}) {
   case "stores":return <Store {...common}/>;
   case "settings":return <Settings2 {...common}/>;
   case "help":return <CircleHelp {...common}/>;
+  case "assistant":return <Sparkles {...common}/>;
   default:return <LayoutDashboard {...common}/>;
  }
 }
 const sections=[
- {label:"WORKSPACE",items:[["/retailer/dashboard","Overview","overview"],["/retailer/orders","Online orders","orders"],["/retailer/pos","New sale / POS","pos"]]},
+ {label:"WORKSPACE",items:[["/retailer/assistant","AI Assistant","assistant"],["/retailer/dashboard","Overview","overview"],["/retailer/orders","Online orders","orders"],["/retailer/pos","New sale / POS","pos"]]},
  {label:"OPERATIONS",items:[["/retailer/catalog","Product catalogue","catalog"],["/retailer/stock","Inventory & stock","stock"],["/retailer/sales","Sales & analytics","sales"],["/retailer/stores","Manage stores","stores"]]},
  {label:"ACCOUNT",items:[["/retailer/settings","Settings","settings"],["/retailer/help","Help & suggestions","help"]]}
 ];
