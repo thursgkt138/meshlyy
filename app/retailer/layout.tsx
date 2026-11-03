@@ -3,17 +3,28 @@ import {useState} from "react";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useRetailerStore,supabase} from "./catalog/use-retailer-store";
+function NavIcon({name}:{name:string}){const paths:Record<string,React.ReactNode>={
+overview:<><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
+orders:<><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></>,
+pos:<><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 10h18M7 15h3M14 15h3"/></>,
+catalog:<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 9v11"/></>,
+stock:<><path d="m12 2 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 17l9 5 9-5"/></>,
+sales:<><path d="M3 20h18M6 16v-5M12 16V5M18 16V9"/><path d="M4 8l5-4 4 3 6-5"/></>,
+stores:<><path d="M3 10h18l-2-6H5l-2 6ZM5 10v10h14V10M9 20v-6h6v6"/></>,
+settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></>,
+help:<><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.8.9-2 1.3-2 3M12 17h.01"/></>
+};return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]||paths.overview}</svg>}
 const sections=[
- {label:"WORKSPACE",items:[["/retailer/dashboard","Overview","◫"],["/retailer/orders","Online orders","▤"],["/retailer/pos","New sale / POS","▦"]]},
- {label:"OPERATIONS",items:[["/retailer/catalog","Product catalogue","▣"],["/retailer/stock","Inventory & stock","▥"],["/retailer/sales","Sales & analytics","◷"],["/retailer/stores","Manage stores","◇"]]},
- {label:"ACCOUNT",items:[["/retailer/settings","Settings","⚙"],["/retailer/help","Help & suggestions","?"]]}
+ {label:"WORKSPACE",items:[["/retailer/dashboard","Overview","overview"],["/retailer/orders","Online orders","orders"],["/retailer/pos","New sale / POS","pos"]]},
+ {label:"OPERATIONS",items:[["/retailer/catalog","Product catalogue","catalog"],["/retailer/stock","Inventory & stock","stock"],["/retailer/sales","Sales & analytics","sales"],["/retailer/stores","Manage stores","stores"]]},
+ {label:"ACCOUNT",items:[["/retailer/settings","Settings","settings"],["/retailer/help","Help & suggestions","help"]]}
 ];
-const mobileLinks=[["/retailer/dashboard","Home","◫"],["/retailer/orders","Orders","▤"],["/retailer/pos","Sell","▦"],["/retailer/stock","Stock","▥"],["/retailer/sales","Sales","◷"]];
+const mobileLinks=[["/retailer/dashboard","Home","overview"],["/retailer/orders","Orders","orders"],["/retailer/pos","Sell","pos"],["/retailer/stock","Stock","stock"],["/retailer/sales","Sales","sales"]];
 export default function RetailerLayout({children}:{children:React.ReactNode}){
  const pathname=usePathname();const store=useRetailerStore();const [menuOpen,setMenuOpen]=useState(false);
  if(["/retailer/login","/retailer/signup","/retailer/onboarding","/retailer/trial"].some(p=>pathname.startsWith(p)))return <>{children}</>;
  const current=sections.flatMap(s=>s.items).find(([href])=>pathname===href)?.[1]||"Retailer Studio";
- const nav=<>{sections.map(section=><div className="ret-nav-section" key={section.label}><div className="ret-nav-caption">{section.label}</div>{section.items.map(([href,label,glyph])=><Link key={href} href={href} onClick={()=>setMenuOpen(false)} aria-current={pathname===href?"page":undefined} className="ret-nav-link"><span className="ret-nav-glyph" aria-hidden>{glyph}</span><span>{label}</span>{pathname===href&&<span className="ret-nav-active-dot" aria-hidden/>}</Link>)}</div>)}</>;
+ const nav=<>{sections.map(section=><div className="ret-nav-section" key={section.label}><div className="ret-nav-caption">{section.label}</div>{section.items.map(([href,label,glyph])=><Link key={href} href={href} onClick={()=>setMenuOpen(false)} aria-current={pathname===href?"page":undefined} className="ret-nav-link"><span className="ret-nav-glyph" aria-hidden><NavIcon name={glyph}/></span><span>{label}</span>{pathname===href&&<span className="ret-nav-active-dot" aria-hidden/>}</Link>)}</div>)}</>;
  return <div className="ret-shell">
   <aside className={"ret-sidebar"+(menuOpen?" ret-sidebar-open":"")}>
    <Link href="/retailer/dashboard" className="ret-brand" onClick={()=>setMenuOpen(false)}><span className="ret-brand-mark">✳</span><span>meshlyy<small>RETAILER STUDIO</small></span></Link>
@@ -28,7 +39,7 @@ export default function RetailerLayout({children}:{children:React.ReactNode}){
     <div className="ret-top-actions"><Link href="/retailer/pos" className="ret-new-sale">＋ New sale</Link><span className="ret-user-avatar" title={store.user?.email||"Retailer"}>{(store.user?.email||"R").slice(0,1).toUpperCase()}</span><button className="ret-signout" onClick={async()=>{if(supabase){await supabase.auth.signOut();location.assign("/retailer/login");}}}>Sign out</button></div>
    </header>
    <div className="ret-page-content">{children}</div>
-   <nav className="ret-bottom-nav" aria-label="Quick navigation">{mobileLinks.map(([href,label,glyph])=><Link href={href} key={href} aria-current={pathname===href?"page":undefined}><span aria-hidden>{glyph}</span><small>{label}</small></Link>)}</nav>
+   <nav className="ret-bottom-nav" aria-label="Quick navigation">{mobileLinks.map(([href,label,glyph])=><Link href={href} key={href} aria-current={pathname===href?"page":undefined}><NavIcon name={glyph}/><small>{label}</small></Link>)}</nav>
   </div>
   <style jsx global>{`
 .ret-shell{--ret-ink:#182a27;--ret-muted:#788780;--ret-line:#e8ede9;--ret-green:#17634d;display:flex;min-height:100vh;background:#f6f8f7;color:var(--ret-ink);font-family:var(--sans,"DM Sans",Arial,sans-serif)}
@@ -41,6 +52,25 @@ export default function RetailerLayout({children}:{children:React.ReactNode}){
 @media(min-width:801px){.ret-page-content>main{min-height:calc(100vh - 72px)!important;padding:27px 30px!important;background:transparent!important;max-width:1500px;margin:0 auto}.ret-page-content>main>nav:first-child{display:none!important}.ret-page-content>main>p:first-of-type{margin-top:4px!important}}
 @media(max-width:1000px) and (min-width:801px){.ret-sidebar{width:214px;flex-basis:214px}.ret-topbar{padding:0 18px}}
 @media(max-width:800px){.ret-sidebar{position:fixed;top:0;left:0;transform:translateX(-100%);transition:transform .2s;box-shadow:12px 0 50px #0d33291c}.ret-sidebar-open{transform:translateX(0)}.ret-mobile-scrim{display:block;position:fixed;inset:0;background:#102a2477;border:0;z-index:40}.ret-topbar{height:60px;padding:0 15px}.ret-menu-button{display:inline-grid;place-items:center;background:#f0f5f1;border:0;border-radius:9px;width:38px;height:38px;font-size:18px;color:#174d3d}.ret-breadcrumb{font-size:11px}.ret-top-actions{gap:8px}.ret-new-sale{padding:10px;font-size:11px}.ret-signout{display:none}.ret-page-content{padding-bottom:76px}.ret-bottom-nav{display:flex;justify-content:space-around;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--ret-line);z-index:30;padding:8px 4px max(8px,env(safe-area-inset-bottom))}.ret-bottom-nav a{display:grid;gap:3px;place-items:center;color:#8b9a90;font-size:20px;min-width:0;text-decoration:none}.ret-bottom-nav a[aria-current=page]{color:#13734e}.ret-bottom-nav small{font-size:9px;font-weight:700}}
+ 
+/* Retailer Studio visual refinement: restrained typography and breathing room */
+.ret-shell{font-family:var(--sans,"DM Sans",Arial,sans-serif);background:#f8faf9}
+.ret-sidebar{width:238px;flex-basis:238px;padding:30px 15px 20px;border-right:1px solid #edf0ee}
+.ret-brand{font-size:24px;letter-spacing:-1.25px;font-weight:750;gap:10px}
+.ret-brand-mark{width:34px;height:34px;border-radius:10px;font-size:23px;background:#edf5f0}
+.ret-brand small{font-size:8px;letter-spacing:1.7px;margin-top:7px}
+.ret-store-card{margin:35px 0 30px;padding:11px;background:#fafbf9;border:1px solid #e9eeeb;border-radius:11px}
+.ret-store-avatar{width:34px;height:34px;flex-basis:34px;border-radius:9px;font-size:14px}
+.ret-store-info strong{font-size:12px}.ret-store-info small{font-size:10px}
+.ret-navigation{gap:28px}.ret-nav-section{gap:4px}
+.ret-nav-caption{font-size:9px;letter-spacing:1.45px;padding:0 13px 10px;color:#a0aba4}
+.ret-nav-link{min-height:41px;padding:10px 12px;font-size:12px;font-weight:550;border-radius:9px;gap:12px;color:#65746d}
+.ret-nav-glyph{width:20px;height:20px}.ret-nav-glyph svg{width:18px;height:18px}
+.ret-nav-link[aria-current=page]{background:#edf5ef;color:#1c674d;font-weight:700}
+.ret-nav-active-dot{display:none}
+.ret-sidebar-bottom{font-size:9px}
+.ret-topbar{background:#ffffffef}
+@media(max-width:1000px) and (min-width:801px){.ret-sidebar{width:210px;flex-basis:210px}}
 `}</style>
  </div>;
 }
