@@ -8,6 +8,7 @@ type Product={id:string;name:string;category:string;packSize:string|null};
 type Listing={store_id:string;store_name:string;locality:string|null;product_id:string;price:number;stock:number};
 type Reservation={id:string;store_id:string;status:string;requested_at:string;expires_at:string|null};
 type ReservationLine={reservation_id:string;product_id:string;quantity:number;price_at_request:number};
+type CartHold={hold_id:string;store_id:string;product_id:string;quantity:number;price_at_hold:number;expires_at:string};
 const products=new Map((catalog as Product[]).map(p=>[p.id,p]));
 const refs=images as Record<string,{url:string}>;
 const imageFor=(p?:Product)=>p?refs[p.name.toLowerCase().replace(/[^a-z0-9]+/g," ").trim()]?.url:null;
@@ -20,6 +21,9 @@ export default function LivePickup(){
  const [query,setQuery]=useState("");const [locality,setLocality]=useState("");
  const [listings,setListings]=useState<Listing[]>([]);
  const [basket,setBasket]=useState<Record<string,number>>({});
+ const [holds,setHolds]=useState<CartHold[]>([]);
+ const [cartBusy,setCartBusy]=useState(false);
+ const cartLock=useRef(false);
  const [orders,setOrders]=useState<Reservation[]>([]);
  const [orderLines,setOrderLines]=useState<ReservationLine[]>([]);
  const [pickupCodes,setPickupCodes]=useState<Record<string,string>>({});
@@ -52,7 +56,19 @@ export default function LivePickup(){
    const {data}=supabase.auth.onAuthStateChange((_event,session)=>setUser(session?.user?.id||null));
    return ()=>data.subscription.unsubscribe();
  },[]);
+ const loadHolds=useCallback(async()=>{
+   if(!supabase||!user){setHolds([]);setBasket({});return;}
+   const {data,error}=await supabase.rpc("my_cart_holds");
+   if(error){setMessage("Cart sync: "+error.message);return;}
+   const rows=(data||[]) as CartHold[];
+   setHolds(rows);
+   const next:Record<string,number>={};
+   for(const h of rows)next[h.store_id+":"+h.product_id]=h.quantity;
+   setBasket(next);
+ },[user]);
+ useEffect(()=>{void loadHolds();},[loadHolds]);
  useEffect(()=>{void loadOrders();},[loadOrders]);
+ useEffect(()=>{if(!user)return;const id=setInterval(()=>{if(!cartLock.current)void loadHolds();},15000);return ()=>clearInterval(id);},[user,loadHolds]);
  useEffect(()=>{if(!user)return;const timer=setInterval(()=>{void loadOrders();},10000);return ()=>clearInterval(timer);},[user,loadOrders]);
  useEffect(()=>{
    if(!supabase||!user)return;
@@ -98,7 +114,17 @@ export default function LivePickup(){
  const selected=Object.entries(basket).filter(([,q])=>q>0).map(([key,q])=>{const l=listings.find(x=>x.store_id+":"+x.product_id===key);return l?{...l,quantity:q}:null;}).filter((x):x is Listing&{quantity:number}=>!!x);
  const groups=Array.from(new Set(selected.map(x=>x.store_id))).map(id=>({id,name:stores.get(id)||"Shop",lines:selected.filter(x=>x.store_id===id)}));
  const track=(l:Listing,eventType:"view"|"basket_add"|"pickup_requested")=>{if(!supabase||!user)return;void supabase.rpc("record_consumer_product_event",{p_store_id:l.store_id,p_product_id:l.product_id,p_event_type:eventType,p_locality:l.locality}).then(({error})=>{if(error)console.warn("Product analytics unavailable:",error.message);});};
- const change=(l:Listing,delta:number)=>{if(delta>0)track(l,"basket_add");const key=l.store_id+":"+l.product_id;setBasket(old=>{const next={...old};const q=Math.min(l.stock,Math.max(0,(old[key]||0)+delta));if(q)next[key]=q;else delete next[key];return next;});};
+ const change=async(l:Listing,delta:number,remove=false)=>{
+   if(!supabase||cartLock.current)return;
+   if(!user){setMessage("Sign in to reserve products in your cart.");return;}
+   const key=l.store_id+":"+l.product_id;
+   const target=remove?0:Math.max(0,Math.min(20,(basket[key]||0)+delta));
+   cartLock.current=true;setCartBusy(true);setMessage("");
+   const {error}=await supabase.rpc("set_cart_hold_quantity",{p_store_id:l.store_id,p_product_id:l.product_id,p_quantity:target});
+   if(error)setMessage(error.message);
+   else {if(delta>0)track(l,"basket_add");await loadHolds();await load();}
+   cartLock.current=false;setCartBusy(false);
+ };
  const login=async()=>{if(!supabase)return;setBusy(true);setMessage("");const r=register?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setBusy(false);setMessage(r.error?.message||(!r.data.session?"Check your email to confirm your account.":"Signed in."));};
  const generateCode=async(id:string)=>{
    if(!supabase)return;
@@ -112,13 +138,15 @@ export default function LivePickup(){
    if(!supabase)return;
    if(!user){setMessage("Please sign in to send a pickup request.");return;}
    setBusy(true);setMessage("");
-   const r=await supabase.rpc("request_pickup",{p_store_id:group.id,p_items:group.lines.map(x=>({product_id:x.product_id,quantity:x.quantity}))});
+   const hold=holds.find(h=>h.store_id===group.id);
+   if(!hold){setBusy(false);setMessage("Cart hold not found. Add products again.");await loadHolds();return;}
+   if(new Date(hold.expires_at).getTime()<=Date.now()){setBusy(false);setMessage("Your 60-second cart hold expired. Add products again.");await loadHolds();return;}
+   const r=await supabase.rpc("confirm_cart_hold",{p_hold_id:hold.hold_id});
    setBusy(false);
    if(r.error){setMessage(r.error.message);return;}
    setMessage("Pickup request sent to "+group.name+". Wait for retailer acceptance before visiting.");
    for(const item of group.lines)track(item,"pickup_requested");
-   setBasket(old=>{const next={...old};for(const x of group.lines)delete next[x.store_id+":"+x.product_id];return next;});
-   await loadOrders();await load();
+   await loadHolds();await loadOrders();await load();
  };
  return <main style={{background:"#f7faf7",minHeight:"100vh",fontFamily:"Arial,sans-serif",color:"#112f2e",padding:"28px max(20px,calc((100vw - 1200px)/2))"}}>
   <nav style={{display:"flex",justifyContent:"space-between",gap:15,flexWrap:"wrap"}}><Link href="/" style={{color:"#116d5a",fontWeight:700,textDecoration:"none"}}>◈ meshlyy home</Link><Link href="/retailer/dashboard" style={{color:"#116d5a"}}>Retailer studio</Link></nav>
@@ -138,10 +166,10 @@ export default function LivePickup(){
       <button type="button" onClick={()=>{setViewed(l.store_id+":"+l.product_id);track(l,"view");}} style={{border:0,background:"transparent",padding:0,textAlign:"left",color:"#286b5a",fontSize:12,cursor:"pointer",marginTop:12}}>View product details</button>
       <p style={{fontSize:12,color:"#387a68",margin:"12px 0 6px",overflowWrap:"anywhere"}}>{l.store_name} · {l.locality||"Local shop"}</p><strong style={{lineHeight:1.4,minHeight:0,overflowWrap:"anywhere"}}>{p?.name||l.product_id}</strong><p style={{fontSize:12,color:"#66857b",margin:"7px 0 4px"}}>{p?.packSize||p?.category||""}</p>
       <div style={{display:"flex",justifyContent:"space-between",marginTop:"10px",alignItems:"center",padding:"10px 0 14px"}}><strong style={{fontSize:22}}>{money(l.price)}</strong><span style={{fontSize:12,color:"#658477"}}>{l.stock} available</span></div>
-      {qty?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={button} onClick={()=>change(l,-1)}>−</button><strong>{qty}</strong><button style={button} onClick={()=>change(l,1)}>+</button></div>:<button style={button} onClick={()=>change(l,1)}>+ Add to basket</button>}
+      {qty?<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={button} disabled={cartBusy||busy} onClick={()=>void change(l,-1)}>−</button><strong>{qty}</strong><button style={button} disabled={cartBusy||busy} onClick={()=>void change(l,1)}>+</button></div>:<button style={button} onClick={()=>change(l,1)}>+ Add to basket</button>}
     </article>;})}
   </div>}
-  {viewed&&(()=>{const listing=listings.find(l=>l.store_id+":"+l.product_id===viewed);if(!listing)return null;const p=products.get(listing.product_id);return <div role="dialog" aria-modal="true" aria-label="Product details" style={{position:"fixed",inset:0,zIndex:100,background:"rgba(16,43,37,.75)",display:"grid",placeItems:"center",padding:20}}><section style={{background:"white",padding:25,borderRadius:20,maxWidth:440,width:"100%"}}><button onClick={()=>setViewed(null)} style={{float:"right",border:0,background:"transparent",cursor:"pointer"}} aria-label="Close details">Close</button><h2 style={{marginTop:8}}>{p?.name||listing.product_id}</h2><p>{p?.category} · {p?.packSize}</p><p>{listing.store_name} · {listing.locality||"Local shop"}</p><strong style={{fontSize:24}}>{money(listing.price)}</strong><p>{listing.stock} units available</p><button style={button} onClick={()=>{change(listing,1);setViewed(null);}}>Add to pickup basket</button></section></div>;})()}
+  {viewed&&(()=>{const listing=listings.find(l=>l.store_id+":"+l.product_id===viewed);if(!listing)return null;const p=products.get(listing.product_id);return <div role="dialog" aria-modal="true" aria-label="Product details" style={{position:"fixed",inset:0,zIndex:100,background:"rgba(16,43,37,.75)",display:"grid",placeItems:"center",padding:20}}><section style={{background:"white",padding:25,borderRadius:20,maxWidth:440,width:"100%"}}><button onClick={()=>setViewed(null)} style={{float:"right",border:0,background:"transparent",cursor:"pointer"}} aria-label="Close details">Close</button><h2 style={{marginTop:8}}>{p?.name||listing.product_id}</h2><p>{p?.category} · {p?.packSize}</p><p>{listing.store_name} · {listing.locality||"Local shop"}</p><strong style={{fontSize:24}}>{money(listing.price)}</strong><p>{listing.stock} units available</p><button style={button} disabled={cartBusy||busy} onClick={()=>{void change(listing,1);setViewed(null);}}>Add to pickup basket</button></section></div>;})()}
   <section id="pickup-baskets" style={{marginTop:48,scrollMarginTop:30}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",gap:16,flexWrap:"wrap",marginBottom:22}}>
       <div><p style={{letterSpacing:2,fontSize:11,fontWeight:700,color:"#41806e",margin:"0 0 8px"}}>YOUR NEIGHBOURHOOD ORDER</p><h2 style={{fontSize:"clamp(28px,3vw,38px)",margin:"0 0 8px"}}>Your pickup baskets <span style={{fontSize:17,fontWeight:400,color:"#729087"}}>({selected.reduce((n,x)=>n+x.quantity,0)} items)</span></h2><p style={{color:"#66847a",fontSize:14,margin:0}}>One pickup request per shop. You only visit after the shop accepts.</p></div>
@@ -169,14 +197,14 @@ export default function LivePickup(){
                 <div style={{display:"inline-flex",alignItems:"center",border:"1px solid #c9ded3",borderRadius:10,overflow:"hidden"}}>
                   <button aria-label={"Decrease quantity of "+(p?.name||l.product_id)} onClick={()=>change(l,-1)} style={{border:0,background:"#f2f8f3",padding:"8px 13px",cursor:"pointer",fontWeight:700,color:"#145745"}}>−</button>
                   <span style={{minWidth:32,textAlign:"center",fontWeight:700,fontSize:13}}>{l.quantity}</span>
-                  <button aria-label={"Increase quantity of "+(p?.name||l.product_id)} disabled={l.quantity>=l.stock} onClick={()=>change(l,1)} style={{border:0,background:"#f2f8f3",padding:"8px 13px",cursor:"pointer",fontWeight:700,color:"#145745",opacity:l.quantity>=l.stock?.4:1}}>+</button>
+                  <button aria-label={"Increase quantity of "+(p?.name||l.product_id)} disabled={cartBusy||busy||l.quantity>=20} onClick={()=>void change(l,1)} style={{border:0,background:"#f2f8f3",padding:"8px 13px",cursor:"pointer",fontWeight:700,color:"#145745",opacity:l.quantity>=l.stock?.4:1}}>+</button>
                 </div>
-                <button onClick={()=>setBasket(old=>{const next={...old};delete next[l.store_id+":"+l.product_id];return next;})} style={{border:0,background:"none",color:"#6d857b",fontSize:12,textDecoration:"underline",cursor:"pointer"}}>Remove</button>
+                <button disabled={cartBusy||busy} onClick={()=>void change(l,0,true)} style={{border:0,background:"none",color:"#6d857b",fontSize:12,textDecoration:"underline",cursor:"pointer"}}>Remove</button>
               </div>
             </div>
             <strong style={{fontSize:16,whiteSpace:"nowrap"}}>{money(l.price*l.quantity)}</strong>
           </div>;})}
-          <div style={{padding:"14px 22px",background:"#fafcf9",fontSize:12,color:"#6b877b"}}>✓ Shop prices confirmed at request time · Stock reserved only after acceptance</div>
+          <div style={{padding:"14px 22px",background:"#fafcf9",fontSize:12,color:"#6b877b"}}>✓ Stock held for 60 seconds after adding to cart · {(()=>{const h=holds.find(x=>x.store_id===g.id);const seconds=h?Math.max(0,Math.ceil((new Date(h.expires_at).getTime()-now)/1000)):0;return seconds>0?"Confirm within "+seconds+"s":"Hold expired — remove and re-add items";})()}</div>
         </div>
         <aside style={{background:"white",border:"1px solid #d9e8e0",borderRadius:20,padding:24,boxShadow:"0 10px 28px rgba(20,65,50,.04)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:20}}><h3 style={{fontSize:21,margin:0}}>Order summary</h3><span style={{fontSize:12,color:"#628378"}}>{count} items</span></div>
@@ -186,7 +214,7 @@ export default function LivePickup(){
             <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#6a867b"}}>Online payment</span><span>Not required</span></div>
           </div>
           <div style={{borderTop:"1px dashed #cfdfd5",margin:"21px 0",paddingTop:18,display:"flex",justifyContent:"space-between",alignItems:"center"}}><strong style={{fontSize:16}}>Estimated total</strong><strong style={{fontSize:28}}>{money(total)}</strong></div>
-          <button disabled={busy} onClick={()=>void reserve(g)} style={{...button,width:"100%",fontSize:15,padding:"16px 12px",opacity:busy?.6:1}}>{busy?"Sending request…":"Request pickup →"}</button>
+          <button disabled={busy||cartBusy||!holds.some(h=>h.store_id===g.id&&new Date(h.expires_at).getTime()>now)} onClick={()=>void reserve(g)} style={{...button,width:"100%",fontSize:15,padding:"16px 12px",opacity:busy||cartBusy?.6:1}}>{busy?"Sending request…":"Request pickup →"}</button>
           <p style={{fontSize:12,color:"#69877b",lineHeight:1.6,margin:"14px 0 0",textAlign:"center"}}>Pay at the shop. Your reservation is pending until the retailer accepts it.</p>
           <div style={{background:"#f1f7f2",borderRadius:12,padding:"13px 15px",marginTop:20}}><strong style={{fontSize:13}}>How pickup works</strong><div style={{fontSize:12,color:"#55776a",lineHeight:1.8,marginTop:6}}>1. Send your request<br />2. Shop confirms availability<br />3. Collect during your pickup window</div></div>
         </aside>
