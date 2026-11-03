@@ -19,4 +19,7 @@ jobs:
       - run: npm ci
       - run: node scripts/test-voice-basket.cjs
       - run: node scripts/test-voice-pos-e2e.cjs
+      # Temporary CI compatibility: dependencies used by existing app source are absent from committed package-lock.json.
+      # Replace with npm ci alone after package.json and package-lock.json are updated together.
+      - run: npm install --no-save --package-lock=false @supabase/supabase-js lucide-react
       - run: npm run typecheck
