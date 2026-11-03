@@ -37,6 +37,9 @@ export default function LivePickup(){
  const [viewed,setViewed]=useState<string|null>(null);
  const [showReservations,setShowReservations]=useState(false);
  const [showMobileCart,setShowMobileCart]=useState(false);
+ const [cancelOrderId,setCancelOrderId]=useState<string|null>(null);
+ const [cancelOrderReason,setCancelOrderReason]=useState("");
+ const [cancelOrderBusy,setCancelOrderBusy]=useState(false);
  const load=useCallback(async()=>{
    if(!supabase){setMessage("Supabase configuration is missing.");setLoading(false);return;}
    const {data,error}=await supabase.rpc("discover_pickup_products",{p_query:"",p_locality:locality.trim(),p_limit:100});
@@ -180,6 +183,14 @@ export default function LivePickup(){
    for(const item of group.lines)track(item,"pickup_requested");
    await loadHolds();await loadOrders();await load();
  };
+ const cancelMyOrder=async()=>{
+  if(!supabase||!cancelOrderId||cancelOrderReason.trim().length<5)return;
+  setCancelOrderBusy(true);setMessage("");
+  const {error}=await supabase.rpc("cancel_my_pickup",{p_reservation_id:cancelOrderId,p_reason:cancelOrderReason.trim()});
+  if(error)setMessage("Cancellation failed: "+error.message);
+  else {setCancelOrderId(null);setCancelOrderReason("");setMessage("Your pickup order has been cancelled.");await loadOrders();await load();}
+  setCancelOrderBusy(false);
+ };
  const cartCount=selected.reduce((sum,l)=>sum+l.quantity,0);
  const cartTotal=selected.reduce((sum,l)=>sum+l.quantity*Number(l.price),0);
  return <main className="pickup-shop" style={{background:"#f7faf7",minHeight:"100vh",fontFamily:"Arial,sans-serif",color:"#112f2e",padding:"28px max(20px,calc((100vw - 1200px)/2))"}}>
@@ -247,6 +258,7 @@ export default function LivePickup(){
               {requested&&<div style={{padding:17,borderRadius:13,background:"#fff6e6",color:"#8c6426",fontSize:13,lineHeight:1.65}}>Your request has been sent. Please wait for the retailer to accept before travelling to the shop.</div>}
               {rejected&&<div style={{padding:17,borderRadius:13,background:"#f9eeea",color:"#8f4d40",fontSize:13,lineHeight:1.65}}>This shop couldn't fulfil the request. No stock was reserved. You can browse and request again.</div>}
               {!requested&&!accepted&&!rejected&&<div style={{fontSize:13,color:"#678579",lineHeight:1.6}}>{o.status==="completed"?"✓ Pickup completed successfully. Your order has been collected.":o.status==="expired"?"Pickup window expired. You can request again.":"This reservation is no longer active. Check the status before visiting the shop."}</div>}
+              {(requested||(accepted&&remaining!==null&&remaining>0))&&<button type="button" className="pickup-cancel-order" onClick={()=>{setCancelOrderId(o.id);setCancelOrderReason("");}}>Cancel this order</button>}
               <div style={{fontSize:12,color:"#6d877a",borderTop:"1px solid #dce9df",paddingTop:13}}>Pickup only · Pay in store · No delivery</div>
             </aside>
           </div>
@@ -255,6 +267,7 @@ export default function LivePickup(){
     </div>}
   </section>}
 </div></div>}
+  {cancelOrderId&&<div className="pickup-cancel-overlay" onClick={()=>{if(!cancelOrderBusy)setCancelOrderId(null);}}><section role="dialog" aria-modal="true" aria-labelledby="pickup-cancel-title" className="pickup-cancel-modal" onClick={e=>e.stopPropagation()}><h2 id="pickup-cancel-title">Cancel pickup order?</h2><p>Your shop will be notified. If items were reserved, they will return to available inventory. This cannot be undone.</p><label htmlFor="pickup-cancel-reason">Why are you cancelling?</label><select id="pickup-cancel-reason" value={cancelOrderReason} onChange={e=>setCancelOrderReason(e.target.value)}><option value="">Choose a reason</option><option value="Changed my mind">Changed my mind</option><option value="Ordered by mistake">Ordered by mistake</option><option value="Cannot collect in time">Cannot collect in time</option><option value="Found the product elsewhere">Found the product elsewhere</option><option value="Other personal reason">Other personal reason</option></select><div className="pickup-cancel-actions"><button type="button" disabled={cancelOrderBusy} onClick={()=>setCancelOrderId(null)}>Keep my order</button><button type="button" disabled={cancelOrderBusy||cancelOrderReason.trim().length<5} onClick={()=>void cancelMyOrder()}>{cancelOrderBusy?"Cancelling…":"Confirm cancellation"}</button></div></section></div>}
   {showMobileCart&&<div className="pickup-drawer-overlay" onClick={()=>setShowMobileCart(false)}><div className="pickup-drawer pickup-mobile-drawer" role="dialog" aria-modal="true" aria-label="Your basket" onClick={e=>e.stopPropagation()}><div className="pickup-drawer-top"><strong>Your pickup basket</strong><button type="button" onClick={()=>setShowMobileCart(false)}>Close ×</button></div><div className="pickup-mobile-cart-content">{groups.map(g=><div className="pickup-mobile-group" key={g.id}><h3>{g.name}</h3>{g.lines.map(l=>{const p=products.get(l.product_id);return <div className="pickup-mobile-line" key={l.product_id}><span>{p?.name||l.product_id}</span><div><button disabled={cartBusy||busy} onClick={()=>void change(l,-1)}>−</button><strong>{l.quantity}</strong><button disabled={cartBusy||busy} onClick={()=>void change(l,1)}>+</button></div><strong>{money(l.price*l.quantity)}</strong></div>;})}<button className="pickup-mobile-checkout" disabled={busy||cartBusy||!holds.some(h=>h.store_id===g.id&&new Date(h.expires_at).getTime()>now)} onClick={()=>void reserve(g)}>Request pickup · {money(g.lines.reduce((n,l)=>n+l.price*l.quantity,0))}</button></div>)}</div></div></div>}
 
  </main>;
