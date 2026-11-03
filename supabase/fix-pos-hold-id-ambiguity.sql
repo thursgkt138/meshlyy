@@ -1,9 +1,11 @@
 -- Fix PL/pgSQL ambiguous hold_id reference in POS quantity RPC.
 -- Apply in Supabase SQL Editor after the original pos-bill-holds.sql migration.
 -- Replaces only set_pos_bill_quantity; keeps atomic stock locking intact.
+-- Fixes output-column name collisions (hold_id / quantity) across SQL statements.
 create or replace function public.set_pos_bill_quantity(p_store_id uuid,p_product_id text,p_quantity integer)
 returns table(hold_id uuid,expires_at timestamptz,quantity integer)
 language plpgsql security definer set search_path='' as $fn$
+#variable_conflict use_column
 declare h public.pos_bill_holds%rowtype; old_qty integer:=0; delta integer; v_price numeric; v_changed integer;
 begin
  if auth.uid() is null then raise exception 'Sign in required'; end if;
@@ -34,7 +36,7 @@ begin
   if not found then raise exception 'Inventory row missing'; end if;
  end if;
  if p_quantity=0 then
-  delete from public.pos_bill_hold_items where hold_id=h.id and product_id=p_product_id;
+  delete from public.pos_bill_hold_items as bi where bi.hold_id=h.id and bi.product_id=p_product_id;
  else
   if v_price is null then
    select price into v_price from public.store_inventory where store_id=p_store_id and product_id=p_product_id;
