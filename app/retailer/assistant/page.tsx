@@ -5,6 +5,7 @@ import {Mic,MicOff,Send,Sparkles,PackageSearch,Boxes,ShoppingCart,BarChart3,Arro
 import catalog from "../../../meshlyy-master-catalog.json";
 import {useRetailerStore} from "../catalog/use-retailer-store";
 import "./assistant.css";
+import {parseBasket,resolveBasket} from "./basket-engine";
 type Product={id:string;name:string;category?:string};
 type Recognition={lang:string;interimResults:boolean;onresult:((e:{results:ArrayLike<{0:{transcript:string}}>;resultIndex:number})=>void)|null;onerror:((e:{error:string})=>void)|null;onend:(()=>void)|null;start:()=>void;stop:()=>void};
 type SpeechWindow=Window&{SpeechRecognition?:new()=>Recognition;webkitSpeechRecognition?:new()=>Recognition};
@@ -25,47 +26,11 @@ export default function RetailAssistant(){
  const indexed=useMemo(()=>store.items.map(i=>({...i,name:byId.get(i.productId)?.name||i.productId})),[store.items]);
  const run=(raw:string)=>{
   const q=norm(raw);setHeard(raw);setError("");setPending(null);setConversation(null);setBasket(null);if(!q)return;
-  // Multi-item voice basket. Never drop unmatched lines or silently select ambiguous SKUs.
-  const numberWords:Record<string,number>={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,ek:1,do:2,teen:3,char:4,paanch:5,एक:1,दो:2,तीन:3,चार:4};
-  const productWords:Record<string,string>={aalu:"potato",aloo:"potato",aaloo:"potato",alu:"potato","आलू":"potato",doodh:"milk",dudh:"milk","दूध":"milk",anda:"egg",ande:"egg",andey:"egg","अंडा":"egg","अंडे":"egg",pyaaz:"onion",pyaz:"onion","प्याज":"onion",tamatar:"tomato","टमाटर":"tomato"};
-  const utterance=q.replace(/\b(and|aur|plus)\b|और/gu,",").replace(/\b(please|basket|cart|add|create|make|bill|for|me)\b/gu," ").trim();
-  const wordParts=utterance.split(/[\s,]+/).filter(Boolean);
-  const isQty=(v:string)=>/^\d+$/.test(v)||numberWords[v]!==undefined;
-  const terms:{term:string;quantity:number}[]=[];
-  let termBuffer:string[]=[];let leadingQuantity:number|null=null;
-  const flush=(qty?:number)=>{if(termBuffer.length){terms.push({term:termBuffer.join(" "),quantity:qty??leadingQuantity??1});termBuffer=[];leadingQuantity=null;}};
-  for(const word of wordParts){
-   if(isQty(word)){
-    const n=numberWords[word]??Number(word);
-    if(termBuffer.length)flush(n);
-    else leadingQuantity=n;
-   }else termBuffer.push(word);
-  }
-  flush();
-  // Bare multi-product speech ("milk bread") has no quantities or separators.
-  // Split only when each word independently names a stocked product category
-  // and the combined phrase is not a contiguous SKU name.
-  if(terms.length===1&&wordParts.length>=2&&wordParts.length<=12&&!wordParts.some(isQty)){
-   const filler=new Set(["stock","check","show","find","sell","sold","bech","becha","diya","aaya","available","kitna","hai","the","my"]);
-   const words=wordParts.filter(w=>!filler.has(w));
-   const mappedWords=words.map(w=>productWords[w]||w);
-   const isSingleSku=indexed.some(i=>norm(i.name).includes(mappedWords.join(" ")));
-   const allIndependentlyStocked=mappedWords.length>1&&mappedWords.every(w=>indexed.some(i=>norm(i.name).split(" ").includes(w)));
-   if(!isSingleSku&&allIndependentlyStocked){
-    terms.splice(0,terms.length,...words.map(term=>({term,quantity:1})));
-   }
-  }
-  const hasBasketSignal=/\b(basket|cart|bill|checkout|multiple|and|aur|plus)\b|और/.test(q)||terms.length>1;
-  if(hasBasketSignal&&terms.length>1){
-   const lines=terms.slice(0,20).map(t=>{
-    const mapped=t.term.split(" ").map(w=>productWords[w]||w);
-    const matches=indexed.map(i=>{const name=norm(i.name).split(" ");return {i,score:mapped.filter(w=>name.includes(w)).length};}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
-    const best=matches[0]?.score||0;
-    const options=matches.filter(x=>x.score===best).slice(0,12).map(x=>({id:x.i.productId,name:x.i.name,stock:x.i.stock}));
-    return {term:t.term,quantity:t.quantity,options,selectedId:options.length===1?options[0].id:"",status:(options.length===0?"missing":options.length===1?"matched":"ambiguous") as "matched"|"ambiguous"|"missing"};
-   });
+  const terms=parseBasket(raw,indexed.map(i=>i.name));
+  if(terms.length>1){
+   const lines=resolveBasket(terms.slice(0,20),indexed.map(i=>({id:i.productId,name:i.name,stock:i.stock})));
    setBasket(lines);
-   setAnswer({title:"Review your voice basket",detail:lines.length+" product requests understood. Choose exact variants for any unresolved lines, then review all items in POS.",warning:"No stock changed. Missing or ambiguous products must be resolved before checkout."});
+   setAnswer({title:"Review your voice basket",detail:lines.length+" product requests understood. Choose exact variants for unresolved lines, then review all items in POS.",warning:"No stock changed. Missing or ambiguous products must be resolved before checkout."});
    return;
   }
   const saleIntent=/bech|becha|bechi|bech diya|sold|sell|sale|बेच|बिका|बेचा|बिक्री/.test(q);
