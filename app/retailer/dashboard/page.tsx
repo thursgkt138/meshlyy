@@ -146,15 +146,12 @@ export default function RetailerDashboard(){
     if(error)setNotice(error);else{setEditing(null);setNotice("Inventory saved in Supabase.");}
   };
   return <main style={{minHeight:"100vh",background:"#f4f6f3",color:"#102f30",padding:"28px max(20px,calc((100vw - 1280px)/2))",fontFamily:"Arial,sans-serif"}}>
-    <nav style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-      <Link href="/" style={{color:"#126c5b",textDecoration:"none",fontWeight:700}}>◈ meshlyy</Link>
-      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}><Link href="/retailer/pos" style={{color:"#126c5b",fontWeight:700}}>Open POS →</Link><Link href="/retailer/sales" style={{color:"#126c5b"}}>Sales & receipts</Link><Link href="/retailer/stock" style={{color:"#126c5b"}}>Stock adjustments</Link><Link href="/retailer/orders" style={{color:"#126c5b"}}>Pickup orders</Link><Link href="/retailer/catalog" style={{color:"#126c5b"}}>Master catalogue →</Link></div>
-    </nav>
-    <p style={{letterSpacing:3,fontSize:12,color:"#477b70",marginTop:18}}>MESHLYY / RETAIL OPERATIONS</p>
-    <h1 style={{fontSize:"clamp(28px,4vw,43px)",letterSpacing:"-2px",margin:"8px 0 10px"}}>Your retail command centre.</h1>
-    <p style={{color:"#5b7770",lineHeight:1.6}}>Live orders, sales, stock and insights in one workspace.</p>
+    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:20,flexWrap:"wrap",marginBottom:24}}>
+      <div><p style={{fontSize:11,fontWeight:650,letterSpacing:1.2,color:"#82918a",margin:"0 0 9px"}}>STORE OVERVIEW</p><h1 style={{fontSize:"clamp(25px,2.8vw,34px)",fontWeight:700,letterSpacing:"-1.2px",margin:"0 0 7px"}}>Good to see you.</h1><p style={{fontSize:13,color:"#73847b",margin:0}}>Here’s what’s happening at your store today.</p></div>
+      <Link href="/retailer/orders" style={{display:"inline-flex",alignItems:"center",padding:"11px 15px",border:"1px solid #e2e9e4",background:"#fff",borderRadius:10,fontSize:12,fontWeight:650,color:"#234e3c",textDecoration:"none"}}>View orders →</Link>
+    </div>
     {r.loading?<p>Loading your store…</p>:r.error?<p role="alert" style={{color:"#a33b30"}}>{r.error}</p>:!r.user?<section style={panel}><h2>Sign in to continue</h2><p>Use the retailer account you created in the catalogue.</p><Link href="/retailer/login">Sign in →</Link> · <Link href="/retailer/signup">Create account →</Link></section>:!r.storeId?<section style={panel}><h2>Set up your shop</h2><p>Create your store from the retailer catalogue first.</p><Link href="/retailer/catalog">Create my shop →</Link></section>:<>
-      <section style={{...panel,marginTop:14,padding:"15px 19px",background:"#143e38",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+      <section style={{...panel,marginTop:14,padding:"17px 21px",background:"#174b3b",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div><small style={{color:"#b7d9c9",letterSpacing:1}}>ACTIVE STORE</small><strong style={{fontSize:20,display:"block",marginTop:3}}>{r.storeName}</strong></div>
         <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
           <button type="button" role="switch" aria-checked={storeOpen} disabled={storeToggleBusy} onClick={()=>void toggleStore()} style={{...button,padding:"11px 14px",background:storeOpen?"#d6f2df":"#f7e7dd",color:storeOpen?"#143e38":"#873f2e"}}>{storeToggleBusy?"Updating…":storeOpen?"● Shop Open · Turn off":"○ Shop Closed · Turn on"}</button>
@@ -164,7 +161,7 @@ export default function RetailerDashboard(){
       </section>
       {storeToggleError&&<p role="alert" style={{color:"#a33b30"}}>{storeToggleError}</p>}
       <section aria-label="Business pulse" style={{margin:"14px 0"}}>
-        <h2 style={{fontSize:20,margin:"0 0 12px"}}>Today at a glance</h2>
+        <h2 style={{fontSize:16,fontWeight:700,margin:"0 0 14px"}}>Today at a glance</h2>
         {metricsError&&<p role="alert" style={{color:"#a33b30"}}>{metricsError}</p>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
         {([
@@ -172,13 +169,10 @@ export default function RetailerDashboard(){
           ["Walk-in transactions",metricsLoading?"Loading…":posSales.length,"/retailer/sales"],
           ["New pickup requests",metricsLoading?"Loading…":pickup.filter(x=>x.status==="requested").length,"/retailer/orders?status=requested"],
           ["Awaiting collection",metricsLoading?"Loading…":pickup.filter(x=>x.status==="accepted").length,"/retailer/orders?status=accepted"]
-        ] as [string,string|number,string][]).map(([label,value,href])=><Link key={label} href={href} style={{...panel,textDecoration:"none",color:"#102f30",display:"block",cursor:"pointer",transition:"transform .15s,box-shadow .15s"}} title={"Open "+label.toLowerCase()}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:27}}>{value}</strong><p style={{fontSize:12,color:"#116d5a",marginBottom:0}}>View details →</p></Link>)}
+        ] as [string,string|number,string][]).map(([label,value,href])=><Link key={label} href={href} style={{...panel,textDecoration:"none",color:"#102f30",display:"block",cursor:"pointer",transition:"transform .15s,box-shadow .15s"}} title={"Open "+label.toLowerCase()}><p style={{fontSize:12,color:"#5e8177"}}>{label}</p><strong style={{fontSize:30,letterSpacing:"-1px"}}>{value}</strong><p style={{fontSize:11,color:"#789084",marginTop:12,marginBottom:0}}>Open report →</p></Link>)}
         </div>
         <p style={{fontSize:12,color:"#668277"}}>Updates every 30 seconds. POS revenue excludes pickup orders. Counts are limited to the most recent 1,000 POS sales and 100 open pickup orders.</p>
       </section>
-      <nav aria-label="Dashboard sections" style={{display:"flex",gap:9,flexWrap:"wrap",margin:"12px 0 20px"}}>
-        {([["#live-orders","Orders"],["#sales-insights","Sales"],["#product-insights","Products"],["#stock-health","Stock"],["#inventory-management","Inventory"]] as [string,string][]).map(([href,label])=><a key={href} href={href} style={{...button,textDecoration:"none",background:"#e5f1ea",color:"#143e38",padding:"10px 15px"}}>{label} ↓</a>)}
-      </nav>
       <section id="live-orders" style={{...panel,marginBottom:20,borderColor:pickup.some(o=>o.status==="requested")?"#c9dfce":"#dce9e2"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
           <div><p style={{fontSize:11,letterSpacing:2,color:"#397e67",fontWeight:700,margin:"0 0 6px"}}>LIVE ORDER INBOX</p><h2 style={{margin:0}}>Pickup requests <span style={{fontSize:16,color:"#5e8177"}}>({pickup.filter(o=>o.status==="requested").length} new)</span></h2></div>
