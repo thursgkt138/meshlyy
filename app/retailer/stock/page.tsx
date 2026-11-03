@@ -11,7 +11,7 @@ const btn:React.CSSProperties={background:"#143e38",color:"white",border:0,borde
 export default function StockAdjustments(){
  const store=useRetailerStore();
  const [product,setProduct]=useState("");
- useEffect(()=>{const id=new URLSearchParams(window.location.search).get("product");if(id)setProduct(id);},[]);
+ useEffect(()=>{const id=new URLSearchParams(window.location.search).get("product");if(id)setProduct(id);const params=new URLSearchParams(window.location.search);const direction=params.get("direction");const quantity=params.get("quantity");if(direction==="add"||direction==="remove")setDirection(direction);if(quantity&&/^\d{1,5}$/.test(quantity))setQuantity(quantity);},[]);
  const [direction,setDirection]=useState("add");
  const [quantity,setQuantity]=useState("1");
  const [reason,setReason]=useState("restock");
