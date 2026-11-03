@@ -36,6 +36,8 @@ export default function LivePickup(){
  const lastTrackedSearch=useRef("");
  const [viewed,setViewed]=useState<string|null>(null);
  const [showReservations,setShowReservations]=useState(false);
+ const [orderTab,setOrderTab]=useState<"active"|"history">("active");
+ const [expandedOrder,setExpandedOrder]=useState<string|null>(null);
  const [showMobileCart,setShowMobileCart]=useState(false);
  const [cancelOrderId,setCancelOrderId]=useState<string|null>(null);
  const [cancelOrderReason,setCancelOrderReason]=useState("");
@@ -224,8 +226,9 @@ export default function LivePickup(){
       <div><p style={{letterSpacing:2,fontSize:11,fontWeight:700,color:"#41806e",margin:"0 0 7px"}}>YOUR ORDER JOURNEY</p><h2 style={{fontSize:"clamp(28px,3vw,38px)",margin:0}}>Your reservations <span style={{fontSize:16,color:"#759187",fontWeight:400}}>({orders.length})</span></h2></div>
       <button style={{...button,background:"#e6f0e9",color:"#143e38"}} onClick={()=>void loadOrders()}>↻ Refresh status</button>
     </div>
+    <div className="pickup-order-tabs"><button type="button" className={orderTab==="active"?"selected":""} onClick={()=>setOrderTab("active")}>Active ({orders.filter(o=>["requested","accepted"].includes(o.status)).length})</button><button type="button" className={orderTab==="history"?"selected":""} onClick={()=>setOrderTab("history")}>History ({orders.filter(o=>!["requested","accepted"].includes(o.status)).length})</button></div>
     {!orders.length?<div style={{border:"1px solid #d9e8e0",background:"white",borderRadius:18,padding:28,color:"#6c867a"}}>No reservations yet. Your pickup requests will appear here.</div>:<div style={{display:"grid",gap:18}}>
-      {orders.map(o=>{
+      {orders.filter(o=>orderTab==="active"?["requested","accepted"].includes(o.status):!["requested","accepted"].includes(o.status)).map(o=>{
         const remaining=o.expires_at?Math.max(0,Math.ceil((new Date(o.expires_at).getTime()-now)/1000)):null;
         const accepted=o.status==="accepted",requested=o.status==="requested",rejected=o.status==="rejected";
         const lines=orderLines.filter(i=>i.reservation_id===o.id);
