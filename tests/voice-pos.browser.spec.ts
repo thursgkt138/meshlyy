@@ -1,3 +1,4 @@
+// @ts-nocheck — Playwright is an isolated CI-only dependency.
 import {test,expect} from "@playwright/test";
 
 // Browser smoke coverage of the actual Next.js routes, with no Supabase credentials.
