@@ -15,12 +15,13 @@ type Answer={title:string;detail:string;items?:{name:string;stock:number;id:stri
 export default function RetailAssistant(){
  const store=useRetailerStore();
  const [input,setInput]=useState("");const [heard,setHeard]=useState("");const [answer,setAnswer]=useState<Answer|null>(null);
+ const [pending,setPending]=useState<{id:string;name:string;quantity:number;action:"sale"|"restock"}|null>(null);
  const [listening,setListening]=useState(false);const [error,setError]=useState("");
  const recognition=useRef<Recognition|null>(null);
  useEffect(()=>()=>{recognition.current?.stop();},[]);
  const indexed=useMemo(()=>store.items.map(i=>({...i,name:byId.get(i.productId)?.name||i.productId})),[store.items]);
  const run=(raw:string)=>{
-  const q=norm(raw);setHeard(raw);setError("");if(!q)return;
+  const q=norm(raw);setHeard(raw);setError("");setPending(null);if(!q)return;
   const saleIntent=/bech|becha|bechi|bech diya|sold|sell|sale|बेच|बिका|बेचा|बिक्री/.test(q);
   const uncertainIntent=/bhej|bheja|bheji|भेज/.test(q);
   const receiveIntent=/aaya|aayi|received|restock|stock aaya|आया|आई|मिला|जमा/.test(q);
@@ -36,6 +37,16 @@ export default function RetailAssistant(){
    const ranked=indexed.map(i=>({i,score:tokens(i.name).filter(t=>phraseTokens.includes(t)).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
    return {amount,unit,ranked};
   }).filter(p=>p.amount>0&&p.ranked.length>0);
+  if((saleIntent||receiveIntent)&&parts.length===0){
+   const ignored=new Set(["bech","becha","bechi","diya","gaya","sold","sell","sale","aaya","aayi","received","stock","add","kar","kiya","hai"]);
+   const requested=tokens(raw).filter(t=>!ignored.has(t));
+   const ranked=indexed.map(i=>({i,score:tokens(i.name).filter(t=>requested.includes(t)).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+   if(!ranked.length){setAnswer({title:"Product not found",detail:"I understood the action, but couldn't match the product to this store's inventory. Please check the product name.",warning:"No stock changed."});return;}
+   if(ranked.length>1&&ranked[0].score===ranked[1].score){setAnswer({title:"Which product?",detail:"Several products match. Please say the brand and pack size.",items:ranked.slice(0,8).map(x=>({id:x.i.productId,name:x.i.name,stock:x.i.stock})),warning:"No stock changed."});return;}
+   const item=ranked[0].i;
+   setPending({id:item.productId,name:item.name,quantity:1,action:saleIntent?"sale":"restock"});
+   setAnswer({title:saleIntent?"Confirm offline sale":"Confirm stock received",detail:item.name+" — quantity not spoken. I've assumed 1 unit. Edit the quantity below before confirming.",warning:"Nothing has been changed yet."});return;
+  }
   if((saleIntent||receiveIntent||uncertainIntent||parts.length>1)&&parts.length){
    if(uncertainIntent&&!saleIntent&&!receiveIntent){setAnswer({title:"Did you mean sold or sent?",detail:"I heard bhej, which could mean sent. Please say bech diya for sold, or stock aaya for received.",warning:"No inventory changes were made."});return;}
    const unresolved=parts.some(p=>p.ranked.length>1&&p.ranked[0].score===p.ranked[1].score);
@@ -43,7 +54,8 @@ export default function RetailAssistant(){
    const description=parts.map(p=>`${p.amount} ${p.unit} — ${p.ranked[0].i.name}`).join("; ");
    if(unresolved){setAnswer({title:"Choose the exact product variant",detail:"Multiple stocked SKUs match this speech. Please specify the brand and pack size before preparing a transaction.",items:parts.flatMap(p=>p.ranked.slice(0,4).map(x=>({id:x.i.productId,name:x.i.name,stock:x.i.stock})))});return;}
    if(fractional){setAnswer({title:"Measured quantity detected",detail:description,warning:"This store still uses integer-based POS holds. Decimal/weight transactions are not enabled until the unit-aware database migration is applied; no stock was changed."});return;}
-   if(receiveIntent&&!saleIntent&&parts.length===1){const p=parts[0];setAnswer({title:"Restock draft",detail:description,link:`/retailer/stock?product=${encodeURIComponent(p.ranked[0].i.productId)}&direction=add&quantity=${p.amount}`,linkText:"Review and confirm restock",warning:"Stock remains unchanged until confirmed."});return;}
+   if(receiveIntent&&!saleIntent&&parts.length===1){const p=parts[0];setPending({id:p.ranked[0].i.productId,name:p.ranked[0].i.name,quantity:p.amount,action:"restock"});setAnswer({title:"Restock draft",detail:description,link:`/retailer/stock?product=${encodeURIComponent(p.ranked[0].i.productId)}&direction=add&quantity=${p.amount}`,linkText:"Review and confirm restock",warning:"Stock remains unchanged until confirmed."});return;}
+   if(saleIntent&&parts.length===1){const p=parts[0];setPending({id:p.ranked[0].i.productId,name:p.ranked[0].i.name,quantity:p.amount,action:"sale"});setAnswer({title:"Confirm offline sale",detail:description,warning:"Review the quantity below, then proceed to POS checkout. No stock has been changed."});return;}
    if(saleIntent||parts.length>1){
     const lines=parts.map(p=>({id:p.ranked[0].i.productId,quantity:p.amount}));
     if(lines.some(l=>l.quantity>100)){setAnswer({title:"Quantity too large",detail:"POS currently limits each product to 100 units.",warning:"No stock was changed."});return;}
@@ -82,7 +94,7 @@ export default function RetailAssistant(){
  return <main className="mesh-assistant"><div className="mesh-ai-head"><div><p>RETAILER STUDIO / AI TOOLS</p><h1>Meshlyy Assistant <Sparkles size={27}/></h1><span>Speak or type. Find products and prepare everyday shop actions.</span></div><span className="mesh-ai-safe"><ShieldCheck size={16}/> Approval-first</span></div>
  <div className="mesh-ai-grid"><section className="mesh-ai-main"><div className="mesh-ai-welcome"><span className="mesh-ai-orb"><Sparkles size={25}/></span><h2>What can I help you with?</h2><p>Ask in English or Hindi. The first version supports inventory lookups, stock drafts and shortcuts to your existing retailer tools.</p></div>
  <div className="mesh-ai-chips">{["Show low stock","Which items are out of stock?","Open sales analytics","Show online orders"].map(q=><button key={q} onClick={()=>{setInput(q);run(q);}}>{q} <ArrowRight size={13}/></button>)}</div>
- {answer&&<section className="mesh-ai-result" aria-live="polite"><small>RESULT FOR: {heard}</small><h2>{answer.title}</h2><p>{answer.detail}</p>{answer.items&&<div className="mesh-ai-products">{answer.items.map(i=><Link href={`/retailer/stock?product=${encodeURIComponent(i.id)}`} key={i.id}><span>{i.name}</span><strong>{i.stock} available</strong></Link>)}</div>}{answer.warning&&<p className="mesh-ai-warning">{answer.warning}</p>}{answer.link&&<Link className="mesh-ai-action" href={answer.link}>{answer.linkText} <ArrowRight size={16}/></Link>}</section>}
+ {answer&&<section className="mesh-ai-result" aria-live="polite"><small>RESULT FOR: {heard}</small><h2>{answer.title}</h2><p>{answer.detail}</p>{answer.items&&<div className="mesh-ai-products">{answer.items.map(i=><Link href={`/retailer/stock?product=${encodeURIComponent(i.id)}`} key={i.id}><span>{i.name}</span><strong>{i.stock} available</strong></Link>)}</div>}{answer.warning&&<p className="mesh-ai-warning">{answer.warning}</p>}{pending&&<div style={{display:"grid",gap:10,marginTop:12,padding:14,background:"#eaf5ed",borderRadius:12}}><label style={{fontSize:12,fontWeight:700}}>Confirm quantity for {pending.name}</label><input aria-label="Confirm quantity" type="number" min="0.001" step="any" value={pending.quantity} onChange={e=>setPending(p=>p?{...p,quantity:Number(e.target.value)}:null)} style={{padding:10,border:"1px solid #c8dfce",borderRadius:8,maxWidth:160}}/><div style={{display:"flex",gap:10,alignItems:"center"}}><button type="button" disabled={!Number.isInteger(pending.quantity)||pending.quantity<1||pending.quantity>100} onClick={()=>{const url=pending.action==="sale"?"/retailer/pos?voiceDraft="+encodeURIComponent(JSON.stringify([{id:pending.id,quantity:pending.quantity}])):"/retailer/stock?product="+encodeURIComponent(pending.id)+"&direction=add&quantity="+pending.quantity;window.location.assign(url);}} style={{padding:"11px 16px",background:"#17553c",color:"#fff",border:0,borderRadius:8,cursor:"pointer"}}>Confirm &amp; review {pending.action==="sale"?"checkout":"stock update"}</button><button type="button" onClick={()=>setPending(null)}>Cancel</button></div><small>Only whole units are supported by the current database. Fractional quantities remain blocked until migration.</small></div>}{answer.link&&<Link className="mesh-ai-action" href={answer.link}>{answer.linkText} <ArrowRight size={16}/></Link>}</section>}
  {error&&<p className="mesh-ai-error" role="alert">{error}</p>}
  <form className="mesh-ai-input" onSubmit={e=>{e.preventDefault();run(input);}}><button type="button" aria-label={listening?"Stop listening":"Speak command"} title={listening?"Stop listening":"Speak command"} className={listening?"is-listening":""} onClick={()=>{if(listening){recognition.current?.stop();setListening(false);}else startVoice();}}>{listening?<MicOff size={21}/>:<Mic size={21}/>}</button><input aria-label="Ask Meshlyy" placeholder={listening?"Listening…":"Ask Meshlyy about your shop…"} value={input} onChange={e=>setInput(e.target.value)}/><button type="submit" aria-label="Send command" disabled={!input.trim()}><Send size={18}/></button></form></section>
  <aside className="mesh-ai-side"><h3>Connected to your shop</h3><div><Boxes size={19}/><span>Inventory products</span><strong>{indexed.length}</strong></div><div><PackageSearch size={19}/><span>Low stock (1–5)</span><strong>{indexed.filter(i=>i.stock>0&&i.stock<=5).length}</strong></div><div><ShoppingCart size={19}/><span>POS checkout</span><Link href="/retailer/pos">Open</Link></div><div><BarChart3 size={19}/><span>Sales reporting</span><Link href="/retailer/sales">Open</Link></div><p>Product matches use your current store inventory. Commands are interpreted locally; microphone recognition depends on browser support and may use your browser's speech service. Nothing is submitted to stock without your confirmation.</p></aside></div></main>;
