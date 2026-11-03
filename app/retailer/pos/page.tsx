@@ -17,6 +17,8 @@ export default function RetailerPOS(){
  const store=useRetailerStore();
  const [query,setQuery]=useState("");
  const [cart,setCart]=useState<Record<string,number>>({});
+ const [voiceDraft,setVoiceDraft]=useState<{id:string;quantity:number}[]>([]);
+ const [voiceDraftBusy,setVoiceDraftBusy]=useState(false);
  const [holdId,setHoldId]=useState<string|null>(null);
  const [holdExpiry,setHoldExpiry]=useState<string|null>(null);
  const [now,setNow]=useState(Date.now());
@@ -45,6 +47,29 @@ export default function RetailerPOS(){
  useEffect(()=>{void refreshBill();},[refreshBill]);
  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
  useEffect(()=>{if(!store.storeId)return;const timer=window.setInterval(()=>{if(!cartLock.current)void refreshBill();},5000);return()=>window.clearInterval(timer);},[store.storeId,refreshBill]);
+ useEffect(()=>{
+  const raw=new URLSearchParams(window.location.search).get("voiceDraft");if(!raw)return;
+  try{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>30)throw Error("Invalid draft");
+   const lines=parsed.map((x:unknown)=>{if(!x||typeof x!=="object")throw Error("Invalid line");const row=x as Record<string,unknown>;return {id:String(row.id),quantity:Number(row.quantity)};});
+   if(lines.some(x=>!byId.has(x.id)||!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>100)||new Set(lines.map(x=>x.id)).size!==lines.length)throw Error("Invalid product or quantity");
+   setVoiceDraft(lines);
+  }catch{setError("Voice draft was invalid. Please create the bill manually.");}
+  window.history.replaceState(null,"",window.location.pathname);
+ },[]);
+ const addVoiceDraft=async()=>{
+  if(!supabase||!store.storeId||voiceDraftBusy||cartLock.current)return;
+  setVoiceDraftBusy(true);cartLock.current=true;setError("");
+  try{
+   for(const line of voiceDraft){
+    const target=(cart[line.id]||0)+line.quantity;
+    if(target>100)throw Error("Maximum 100 units per item");
+    const result=await supabase.rpc("set_pos_bill_quantity",{p_store_id:store.storeId,p_product_id:line.id,p_quantity:target});
+    if(result.error)throw result.error;
+   }
+   setVoiceDraft([]);setNotice("Voice items added to the held bill. Verify all items before checkout.");
+  }catch(e){setError("Could not add all voice items: "+String(e)+". Check the cart before retrying.");setVoiceDraft([]);}
+  finally{await refreshBill();cartLock.current=false;setVoiceDraftBusy(false);}
+ };
  const available=store.items.filter(i=>i.active&&i.stock>0);
  const matches=available.filter(i=>{const p=byId.get(i.productId);return [p?.name,p?.category,p?.packSize].join(" ").toLowerCase().includes(query.toLowerCase());}).slice(0,60);
  const lines=Object.entries(cart).map(([id,quantity])=>{const i=store.items.find(x=>x.productId===id);return i?{...i,quantity,product:byId.get(id)}:null;}).filter((x):x is NonNullable<typeof x>=>!!x&&x.quantity>0);
@@ -86,6 +111,7 @@ export default function RetailerPOS(){
   {store.loading?<p className="pos-message">Loading store…</p>:!store.user?<p className="pos-message">Sign in at <Link href="/retailer/login">retailer login</Link>.</p>:!store.storeId?<p className="pos-message">Create a store from the <Link href="/retailer/catalog">catalogue</Link> first.</p>:<>
   <div className="pos-summary"><div className="pos-stat"><span className="pos-stat-icon"><Package size={19}/></span><div><small>Available products</small><strong>{available.length}</strong></div></div><div className="pos-stat"><span className="pos-stat-icon"><AlertTriangle size={19}/></span><div><small>Low stock</small><strong>{store.items.filter(i=>i.stock>0&&i.stock<=5).length}</strong></div></div><div className="pos-stat"><span className="pos-stat-icon"><ReceiptText size={19}/></span><div><small>Recent transactions</small><strong>{sales.length}</strong></div></div><div className="pos-stat"><span className="pos-stat-icon"><IndianRupee size={19}/></span><div><small>Today's POS sales</small><strong>{money(todaySales.reduce((sum,x)=>sum+Number(x.total),0))}</strong></div></div></div>
   {error&&<div className="pos-alert" role="alert">{error}</div>}{notice&&<div className="pos-success" role="status">{notice}</div>}
+  {voiceDraft.length>0&&<section style={{background:"#eaf5ed",border:"1px solid #b8d9c5",padding:20,borderRadius:14,marginBottom:20}}><h2 style={{fontSize:18,margin:"0 0 10px"}}>Voice bill — review before adding</h2>{voiceDraft.map(line=><p key={line.id} style={{fontSize:13}}>{byId.get(line.id)?.name||line.id} × {line.quantity}</p>)}<div style={{display:"flex",gap:10}}><button type="button" disabled={voiceDraftBusy} onClick={()=>void addVoiceDraft()} style={button}>{voiceDraftBusy?"Adding…":"Add to POS cart"}</button><button type="button" onClick={()=>setVoiceDraft([])}>Discard</button></div><p style={{fontSize:11}}>This creates a temporary stock hold, not a completed sale. Verify the bill and payment method before checkout.</p></section>}
   <div className="pos-workspace">
    <section className="pos-products"><div className="pos-section-head"><div><span className="pos-section-kicker">PRODUCT LIBRARY</span><h2>Find a product</h2></div><span className="pos-count">{available.length} available</span></div>
     <div className="pos-search"><Search size={19}/><input aria-label="Search stocked products" placeholder="Search by product name or category" value={query} onChange={e=>setQuery(e.target.value)}/>{query&&<button aria-label="Clear search" onClick={()=>setQuery("")}><X size={17}/></button>}</div>
