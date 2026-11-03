@@ -29,6 +29,27 @@ export default function RetailAssistant(){
   const unitLine=/(\d+(?:\.\d+)?|aadha|adha|half|sawa|dhai|pauna|आधा|सवा|ढाई)\s*(kilo|kg|kilogram|gram|g|packet|packets|pack|piece|pieces|pcs|litre|liter|l|ml|किलो|ग्राम|पैकेट|पीस)?\s+([^,;]+?)(?=\s+(?:aur|and|और)\s+\d|[,;]|$)/giu;
   const alias=(v:string)=>{const groups=[["onion","onions","pyaaz","pyaz","pyaj","piyaz","प्याज","प्याज़"],["potato","potatoes","aloo","alu","aaloo","aalu","आलू"],["tomato","tomatoes","tamatar","टमाटर"],["milk","doodh","dudh","दूध"],["sugar","cheeni","chini","चीनी"],["rice","chawal","चावल","akki"],["coriander","dhaniya","dhania","धनिया","kottambari"],["curd","dahi","दही","mosaru"],["ginger","adrak","अदरक","shunti"],["garlic","lahsun","लहसुन","bellulli"],["banana","kela","केला","baale"]];return groups.find(g=>g.includes(v))?.[0]||v;};
   const tokens=(v:string)=>norm(v).split(" ").filter(Boolean).map(alias);
+  // Read-only natural-language stock lookup, including short utterances such as "4 kg Aalu".
+  // Never infer kg availability from a whole-unit stock count.
+  const stockQuestion=/\\b(stock|available|availability|have|left|remaining|check|kitna|kitne|hai|hain|bacha|bachi|milega|milegi|quantity)\\b|स्टॉक|कितना|कितने|बचा|उपलब्ध/.test(q);
+  const actionRequested=saleIntent||receiveIntent||uncertainIntent;
+  const quantityMention=raw.match(/(\\d+(?:\\.\\d+)?)\\s*(kilograms?|kilos?|kg|grams?|g|litres?|liters?|ml|packets?|packs?|pieces?|pcs)?/i);
+  const requestedAmount=quantityMention?Number(quantityMention[1]):null;
+  const requestedUnit=(quantityMention?.[2]||"").toLowerCase();
+  const isMeasured=/^(kilograms?|kilos?|kg|grams?|g|litres?|liters?|ml)$/.test(requestedUnit);
+  const lookupTokens=tokens(raw).filter(t=>!new Set(["stock","available","availability","have","left","remaining","check","kitna","kitne","hai","hain","bacha","bachi","milega","milegi","quantity","kg","kilo","kilogram","gram","g","litre","liter","ml","pack","packet","piece","pcs"]).has(t)&&!/^\\d+(?:\\.\\d+)?$/.test(t));
+  if(!actionRequested&&(stockQuestion||requestedAmount!==null)&&lookupTokens.length){
+   const matches=indexed.map(i=>({i,score:tokens(i.name).filter(t=>lookupTokens.includes(t)).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+   if(matches.length){
+    const best=matches[0];
+    if(matches.length>1&&matches[1].score===best.score){setAnswer({title:"Which product do you mean?",detail:"I found multiple stocked variants. Select the exact product to check availability.",items:matches.slice(0,8).map(x=>({id:x.i.productId,name:x.i.name,stock:x.i.stock})),warning:"Stock lookup only. No changes made."});return;}
+    const item=best.i;
+    if(isMeasured){setAnswer({title:"Found "+item.name,detail:"You asked about "+requestedAmount+" "+requestedUnit+". The current store records "+item.stock+" whole inventory units, not kilograms or litres. I cannot accurately confirm a weight-based quantity until this SKU has a verified measurement unit and conversion.",warning:"No stock changed. Weight availability is unknown."});return;}
+    const enough=requestedAmount===null?null:item.stock>=requestedAmount;
+    setAnswer({title:item.name,detail:"Available: "+item.stock+" whole units."+ (requestedAmount===null?"": " Requested: "+requestedAmount+" units. "+(enough?"Sufficient available units.":"Insufficient available units.")),items:[{id:item.productId,name:item.name,stock:item.stock}],warning:"Read-only lookup. No stock changed."});return;
+   }
+   setAnswer({title:"Product not in this shop's inventory",detail:"I understood the product lookup, but could not find a stocked SKU. Add the correct product from the catalogue before checking live availability.",warning:"No stock changed."});return;
+  }
   const parts=[...raw.matchAll(unitLine)].map(m=>{
    const words:Record<string,number>={aadha:.5,adha:.5,half:.5,sawa:1.25,dhai:2.5,pauna:.75,"आधा":.5,"सवा":1.25,"ढाई":2.5};
    const amount=words[m[1].toLowerCase()]??Number(m[1]);
