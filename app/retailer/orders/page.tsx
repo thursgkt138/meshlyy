@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
+import {ClipboardList,Clock3,CheckCircle2,RefreshCw,PackageCheck,ShieldCheck,Inbox,History,AlertCircle,Check,X,Timer,Package} from "lucide-react";
 import catalog from "../../../meshlyy-master-catalog.json";
 import imageReferences from "../../../meshlyy-source-image-references.json";
 import {useRetailerStore,supabase} from "../catalog/use-retailer-store";
@@ -63,48 +64,41 @@ export default function RetailerOrders(){
    setBusy("");
  };
  const filtered=orders.filter(o=>statusFilter==="all"?true:statusFilter==="active"?["requested","accepted"].includes(o.status):statusFilter==="history"?!["requested","accepted"].includes(o.status):o.status===statusFilter);
- return <main style={{background:"#f7faf7",minHeight:"100vh",color:"#102f30",fontFamily:"Arial,sans-serif",padding:"30px max(20px,calc((100vw - 1120px)/2))"}}>
-   <nav style={{display:"flex",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}><Link href="/retailer/dashboard" style={{color:"#146858"}}>← Dashboard</Link><Link href="/retailer/catalog" style={{color:"#146858"}}>Master catalogue</Link></nav>
-   <p style={{fontSize:12,letterSpacing:3,color:"#54877a",marginTop:38}}>MESHLYY / RETAILER STUDIO</p>
-   <h1 style={{fontSize:"clamp(32px,5vw,50px)",margin:"8px 0"}}>Pickup reservations.</h1>
-   <p style={{color:"#587a70",lineHeight:1.6}}>Review requests, reserve stock on acceptance and manage collection windows. Pickup only — no delivery.</p>
-   <div style={{...card,margin:"22px 0",background:"#edf6f0"}}><strong>Reservation system preview</strong><p style={{marginBottom:0,color:"#53776b"}}>Consumer pickup requests are now connected. Verified pickup completion and automated server-side expiry are still required before launch.</p></div>
-   {store.loading?<p>Loading your shop…</p>:store.error?<p role="alert">{store.error}</p>:!store.user?<div style={card}>Please <Link href="/retailer/catalog">sign in</Link> to view your shop reservations.</div>:!store.storeId?<div style={card}>Please <Link href="/retailer/catalog">create your shop</Link> first.</div>:<>
-     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:20}}><strong>{store.storeName}</strong><button style={btn} onClick={()=>void refresh()}>Refresh orders</button></div>
-     <div style={{display:"flex",gap:10,marginBottom:20}}><button style={{...btn,background:tab==="active"?"#143e38":"#e6f0e9",color:tab==="active"?"#fff":"#143e38"}} onClick={()=>{setTab("active");setStatusFilter("active");}}>Open requests ({orders.filter(o=>["requested","accepted"].includes(o.status)).length})</button><button style={{...btn,background:tab==="history"?"#143e38":"#e6f0e9",color:tab==="history"?"#fff":"#143e38"}} onClick={()=>{setTab("history");setStatusFilter("history");}}>History ({orders.filter(o=>!["requested","accepted"].includes(o.status)).length})</button></div>
-     <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{(["all","requested","accepted","completed","rejected","expired"] as const).map(status=><button key={status} type="button" onClick={()=>{setStatusFilter(status);setTab(status==="requested"||status==="accepted"?"active":"history");}} style={{...btn,padding:"8px 12px",fontSize:12,background:statusFilter===status?"#143e38":"#e6f0e9",color:statusFilter===status?"white":"#143e38",textTransform:"capitalize"}}>{status==="all"?"All orders":status} ({status==="all"?orders.length:orders.filter(o=>o.status===status).length})</button>)}</div>
-     {error&&<p role="alert" style={{color:"#b33b31"}}>{error}</p>}
-     <div style={{display:"grid",gap:18}}>{filtered.map(o=>{
-       const lines=items.filter(i=>i.reservation_id===o.id);
-       const remaining=o.expires_at?Math.max(0,Math.ceil((new Date(o.expires_at).getTime()-now)/1000)):null;
-       const total=lines.reduce((sum,i)=>sum+Number(i.price_at_request)*i.quantity,0);
-       const units=lines.reduce((sum,i)=>sum+i.quantity,0);
-       const isPending=o.status==="requested";
-       const isAccepted=o.status==="accepted";
-       const statusColor=isPending?"#94621d":isAccepted?"#166d54":"#677c72";
-       return <article key={o.id} style={{...card,padding:0,overflow:"hidden",boxShadow:"0 10px 28px rgba(21,65,50,.035)"}}>
-         <div style={{padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",borderBottom:"1px solid #e7efea",background:"#fcfdfb"}}>
-           <div><div style={{fontSize:11,color:"#628a7c",fontWeight:700,letterSpacing:1.5,marginBottom:7}}>PICKUP ORDER</div><strong style={{fontSize:21}}>#{o.id.slice(0,8).toUpperCase()}</strong><div style={{fontSize:12,color:"#6e887c",marginTop:5}}>{new Date(o.requested_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})} · {units} {units===1?"item":"items"}</div></div>
-           <span style={{fontSize:12,fontWeight:700,borderRadius:99,padding:"9px 13px",color:statusColor,background:isPending?"#fff4df":isAccepted?"#e7f6ed":"#eff3f0",textTransform:"capitalize"}}>● {o.status}</span>
-         </div>
-         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,310px),1fr))",gap:0}}>
-           <div style={{padding:"6px 24px 14px",minWidth:0}}>
-             {lines.map((i,index)=>{const p=productById.get(i.product_id);const image=productImage(p);return <div key={i.product_id} style={{display:"flex",gap:14,alignItems:"center",padding:"15px 0",borderBottom:index===lines.length-1?"none":"1px solid #edf2ee"}}>
-               <div style={{width:76,height:80,flex:"0 0 76px",borderRadius:11,background:"#f0f6f1",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>{image?<img src={image} alt={p?.name||"Product"} loading="lazy" referrerPolicy="no-referrer" style={{display:"block",width:"100%",height:"100%",objectFit:"contain",padding:6,boxSizing:"border-box"}}/>:<span style={{fontSize:10,color:"#749084",textAlign:"center"}}>No image</span>}</div>
-               <div style={{flex:1,minWidth:0}}><strong style={{display:"block",fontSize:14,lineHeight:1.4,overflowWrap:"anywhere"}}>{p?.name||"Unknown catalogue product"}</strong><div style={{fontSize:12,color:"#6d887c",marginTop:5}}>{p?.packSize||p?.category||"Product"} · Qty {i.quantity}</div><div style={{fontSize:12,color:"#70887d",marginTop:5}}>{fmt(Number(i.price_at_request))} each</div></div>
-               <strong style={{fontSize:15,whiteSpace:"nowrap"}}>{fmt(Number(i.price_at_request)*i.quantity)}</strong>
-             </div>;})}
-           </div>
-           <aside style={{background:"#f5faf6",borderLeft:"1px solid #e5eee7",padding:24,display:"flex",flexDirection:"column",gap:16}}>
-             <div><div style={{fontSize:11,letterSpacing:1.4,color:"#618577",fontWeight:700}}>ORDER SUMMARY</div><div style={{display:"flex",justifyContent:"space-between",marginTop:16,fontSize:14}}><span style={{color:"#688277"}}>Items ({units})</span><strong>{fmt(total)}</strong></div><div style={{display:"flex",justifyContent:"space-between",marginTop:11,fontSize:14}}><span style={{color:"#688277"}}>Pickup</span><strong style={{color:"#197354"}}>Free</strong></div><div style={{borderTop:"1px dashed #cbded1",paddingTop:16,marginTop:18,display:"flex",justifyContent:"space-between",alignItems:"center"}}><strong>Total</strong><strong style={{fontSize:25}}>{fmt(total)}</strong></div></div>
-             {isPending&&<><p style={{fontSize:12,color:"#6b867a",lineHeight:1.6,margin:0}}>Accept only if every item is available. Stock is reserved when you accept.</p><button disabled={busy===o.id} onClick={()=>void action(o.id,"accept")} style={{...btn,padding:"15px 14px",width:"100%",opacity:busy===o.id?.6:1}}>{busy===o.id?"Processing…":"✓ Accept & reserve stock"}</button><button disabled={busy===o.id} onClick={()=>void action(o.id,"reject")} style={{...btn,background:"#f3e9e6",color:"#904536",width:"100%"}}>Reject request</button></>}
-             {isAccepted&&<><div style={{background:"#e4f4e9",borderRadius:12,padding:15}}><div style={{fontSize:12,color:"#3d7965",fontWeight:700}}>PICKUP WINDOW</div><strong style={{fontSize:25,color:remaining===0?"#ad3d31":"#155d48",display:"block",marginTop:6}}>{remaining===0?"Time elapsed":`${Math.floor((remaining||0)/60)}:${String((remaining||0)%60).padStart(2,"0")}`}</strong><p style={{fontSize:12,color:"#618273",margin:"7px 0 0"}}>Awaiting verified collection workflow</p></div>{remaining!==null&&remaining>0&&<div style={{background:"white",border:"1px solid #d4e6da",borderRadius:12,padding:15}}><label htmlFor={"code-"+o.id} style={{fontSize:12,fontWeight:700,display:"block",marginBottom:9}}>Customer pickup code</label><input id={"code-"+o.id} type="text" inputMode="numeric" autoComplete="off" maxLength={6} placeholder="6-digit code" value={codes[o.id]||""} onChange={e=>{setCodes(old=>({...old,[o.id]:e.target.value.replace(/[^0-9]/g,"").slice(0,6)}));setCodeErrors(old=>({...old,[o.id]:""}));}} style={{width:"100%",padding:"12px",border:"1px solid #cbded2",borderRadius:9,fontSize:18,letterSpacing:3,boxSizing:"border-box"}}/><button type="button" disabled={busy===o.id} onClick={()=>void complete(o.id)} style={{...btn,width:"100%",marginTop:10,opacity:busy===o.id?.6:1}}>{busy===o.id?"Verifying…":"Verify & complete pickup"}</button>{codeErrors[o.id]&&<p role="alert" style={{fontSize:12,color:"#b33b31",margin:"9px 0 0"}}>{codeErrors[o.id]}</p>}<p style={{fontSize:11,color:"#718b7f",lineHeight:1.5}}>Enter the six digits shown on the customer’s accepted reservation. Only hand over items after successful verification.</p></div>}{remaining===0&&<button disabled={busy===o.id} onClick={()=>void action(o.id,"expire")} style={btn}>Expire & release stock</button>}</>}
-             {!isPending&&!isAccepted&&<p style={{fontSize:13,color:"#6a8579",margin:0}}>This reservation is in your order history.</p>}
-           </aside>
-         </div>
-       </article>;
-     })}</div>
-     {!filtered.length&&<div style={{...card,textAlign:"center",padding:45,color:"#678479"}}>{tab==="active"?"No pickup requests yet.":"No reservation history yet."}</div>}
-   </>}
+ const pendingCount=orders.filter(o=>o.status==="requested").length;
+ const acceptedCount=orders.filter(o=>o.status==="accepted").length;
+ const completedCount=orders.filter(o=>o.status==="completed").length;
+ const activeCount=pendingCount+acceptedCount;
+ return <main className="orders-studio">
+  <div className="orders-heading"><div><p className="orders-eyebrow">RETAIL OPERATIONS <span>/</span> ONLINE ORDERS</p><h1>Pickup orders<span className="orders-dot">.</span></h1><p className="orders-subtitle">From new requests to verified handovers, all in one place.</p></div><div className="orders-heading-actions"><span className="orders-live"><span/> Live updates</span><button type="button" onClick={()=>void refresh()}><RefreshCw size={16}/> Refresh</button></div></div>
+  {store.loading?<p className="orders-message">Loading your shop…</p>:store.error?<p role="alert">{store.error}</p>:!store.user?<div className="orders-message">Please <Link href="/retailer/login">sign in</Link> to view orders.</div>:!store.storeId?<div className="orders-message">Please <Link href="/retailer/catalog">create your shop</Link> first.</div>:<>
+  <div className="orders-stats">
+   <div className="orders-stat"><span className="orders-stat-icon amber"><Inbox size={20}/></span><div><small>New requests</small><strong>{pendingCount}</strong></div></div>
+   <div className="orders-stat"><span className="orders-stat-icon green"><Clock3 size={20}/></span><div><small>Awaiting pickup</small><strong>{acceptedCount}</strong></div></div>
+   <div className="orders-stat"><span className="orders-stat-icon blue"><CheckCircle2 size={20}/></span><div><small>Completed pickups</small><strong>{completedCount}</strong></div></div>
+   <div className="orders-stat"><span className="orders-stat-icon neutral"><ClipboardList size={20}/></span><div><small>All orders</small><strong>{orders.length}</strong></div></div>
+  </div>
+  <div className="orders-toolbar"><div className="orders-tabs"><button className={tab==="active"?"selected":""} onClick={()=>{setTab("active");setStatusFilter("active");}}><Inbox size={16}/> Active orders <span>{activeCount}</span></button><button className={tab==="history"?"selected":""} onClick={()=>{setTab("history");setStatusFilter("history");}}><History size={16}/> Order history <span>{orders.length-activeCount}</span></button></div><div className="orders-store"><Package size={15}/>{store.storeName}</div></div>
+  <div className="orders-filters">{(["active","requested","accepted","completed","rejected","expired","all"] as const).map(status=><button key={status} type="button" className={statusFilter===status?"selected":""} onClick={()=>{setStatusFilter(status);setTab(status==="active"||status==="requested"||status==="accepted"?"active":"history");}}>{status==="active"?"Active":status==="all"?"All orders":status==="requested"?"New requests":status==="accepted"?"Awaiting pickup":status==="completed"?"Completed":status==="rejected"?"Rejected":"Expired"} <span>{status==="active"?activeCount:status==="all"?orders.length:orders.filter(o=>o.status===status).length}</span></button>)}</div>
+  {error&&<div className="orders-error" role="alert"><AlertCircle size={18}/>{error}</div>}
+  <div className="orders-list">{filtered.map(o=>{
+   const lines=items.filter(i=>i.reservation_id===o.id);
+   const remaining=o.expires_at?Math.max(0,Math.ceil((new Date(o.expires_at).getTime()-now)/1000)):null;
+   const total=lines.reduce((sum,i)=>sum+Number(i.price_at_request)*i.quantity,0);
+   const units=lines.reduce((sum,i)=>sum+i.quantity,0);
+   const isPending=o.status==="requested";
+   const isAccepted=o.status==="accepted";
+   const statusText=isPending?"New request":isAccepted?"Awaiting pickup":o.status==="completed"?"Collected":o.status==="rejected"?"Rejected":"Expired";
+   return <article className="orders-card" key={o.id}>
+    <div className="orders-card-top"><div className="orders-order-id"><span className="orders-order-icon"><ClipboardList size={19}/></span><div><small>ORDER #{o.id.slice(0,8).toUpperCase()}</small><strong>{new Date(o.requested_at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})}</strong></div></div><div className="orders-card-meta"><span>{units} {units===1?"item":"items"}</span><span className={"orders-status "+(isPending?"pending":isAccepted?"accepted":o.status==="completed"?"completed":"muted")}><span/>{statusText}</span></div></div>
+    <div className="orders-card-body"><div className="orders-product-section"><div className="orders-section-label">ORDER ITEMS <span>{lines.length} products</span></div>{lines.map(i=>{const p=productById.get(i.product_id);const image=productImage(p);return <div className="orders-product" key={i.product_id}><div className="orders-product-img">{image?<img src={image} alt={p?.name||"Product"} loading="lazy" referrerPolicy="no-referrer"/>:<Package size={22}/>}</div><div className="orders-product-name"><strong>{p?.name||"Unknown catalogue product"}</strong><small>{p?.packSize||p?.category||"Product"} · Qty {i.quantity}</small></div><strong className="orders-line-total">{fmt(Number(i.price_at_request)*i.quantity)}</strong></div>;})}{!lines.length&&<p className="orders-empty-products">Order items are loading or unavailable.</p>}</div>
+    <aside className="orders-actions"><div className="orders-section-label">ORDER SUMMARY</div><div className="orders-summary-row"><span>Items ({units})</span><strong>{fmt(total)}</strong></div><div className="orders-summary-row"><span>Pickup</span><strong className="orders-free">Free</strong></div><div className="orders-total"><span>Total amount</span><strong>{fmt(total)}</strong></div>
+    {isPending&&<div className="orders-decision"><p>Check availability before accepting. Stock will be reserved on acceptance.</p><button className="orders-primary" disabled={busy===o.id} onClick={()=>void action(o.id,"accept")}><Check size={18}/>{busy===o.id?"Processing…":"Accept & reserve"}</button><button className="orders-secondary-danger" disabled={busy===o.id} onClick={()=>void action(o.id,"reject")}><X size={16}/> Reject order</button></div>}
+    {isAccepted&&<div className="orders-pickup"><div className={"orders-timer"+(remaining===0?" expired":remaining!==null&&remaining<=120?" urgent":"")}><div><span><Timer size={16}/> PICKUP WINDOW</span><strong>{remaining===0?"Time elapsed":remaining===null?"—":`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,"0")}`}</strong></div><Clock3 size={23}/></div>{remaining!==null&&remaining>0&&<div className="orders-verification"><label htmlFor={"code-"+o.id}>Customer pickup code</label><input id={"code-"+o.id} type="text" inputMode="numeric" autoComplete="off" maxLength={6} placeholder="Enter 6-digit code" value={codes[o.id]||""} onChange={e=>{setCodes(old=>({...old,[o.id]:e.target.value.replace(/[^0-9]/g,"").slice(0,6)}));setCodeErrors(old=>({...old,[o.id]:""}));}}/><button className="orders-primary" type="button" disabled={busy===o.id||(codes[o.id]||"").length!==6} onClick={()=>void complete(o.id)}><ShieldCheck size={17}/>{busy===o.id?"Verifying…":"Verify & complete"}</button>{codeErrors[o.id]&&<p role="alert">{codeErrors[o.id]}</p>}<small>Hand over items only after the code is verified.</small></div>}{remaining===0&&<button className="orders-secondary-danger" disabled={busy===o.id} onClick={()=>void action(o.id,"expire")}>Expire & release stock</button>}</div>}
+    {!isPending&&!isAccepted&&<div className="orders-closed"><PackageCheck size={18}/> This order is in your history.</div>}
+    </aside></div>
+   </article>;
+  })}</div>
+  {!filtered.length&&<div className="orders-empty"><span><Inbox size={29}/></span><h2>{statusFilter==="active"?"You're all caught up":statusFilter==="history"?"No order history yet":"No matching orders"}</h2><p>{statusFilter==="active"?"New pickup requests will appear here automatically.":"Try a different status filter to view other orders."}</p></div>}
+  </>}
  </main>;
 }
