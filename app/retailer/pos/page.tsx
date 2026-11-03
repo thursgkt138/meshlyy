@@ -36,7 +36,7 @@ export default function RetailerPOS(){
  const refreshBill=useCallback(async()=>{
   if(!supabase||!store.storeId)return;
   const {data,error}=await supabase.rpc("my_pos_bill_hold",{p_store_id:store.storeId});
-  if(error){setError("Bill sync: "+error.message);return;}
+  if(error){setError("Bill sync (my_pos_bill_hold): "+error.message);return;}
   const rows=(data||[]) as {hold_id:string;product_id:string;quantity:number;expires_at:string}[];
   setHoldId(rows[0]?.hold_id||null);setHoldExpiry(rows[0]?.expires_at||null);
   const next:Record<string,number>={};for(const row of rows)next[row.product_id]=row.quantity;
@@ -55,7 +55,7 @@ export default function RetailerPOS(){
   cartLock.current=true;setCartBusy(true);setError("");
   try{
    const {error}=await supabase.rpc("set_pos_bill_quantity",{p_store_id:store.storeId,p_product_id:id,p_quantity:target});
-   if(error)setError(error.message);
+   if(error)setError("Add/update item (set_pos_bill_quantity): "+error.message);
    await refreshBill();
   }catch(e){setError(String(e));}
   finally{cartLock.current=false;setCartBusy(false);}
