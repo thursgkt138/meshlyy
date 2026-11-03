@@ -1,3 +1,4 @@
+// @ts-nocheck — Playwright is an isolated CI-only dependency.
 import {defineConfig,devices} from "@playwright/test";
 export default defineConfig({
  testDir:"./tests",
