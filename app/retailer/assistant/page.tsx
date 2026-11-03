@@ -22,17 +22,22 @@ export default function RetailAssistant(){
  const run=(raw:string)=>{
   const q=norm(raw);setHeard(raw);setError("");if(!q)return;
   const saleIntent=/bech|becha|bechi|bech diya|sold|sell|sale|बेच|बिका|बेचा|बिक्री/.test(q);
+  const uncertainIntent=/bhej|bheja|bheji|भेज/.test(q);
   const receiveIntent=/aaya|aayi|received|restock|stock aaya|आया|आई|मिला|जमा/.test(q);
-  const unitLine=/(\\d+(?:\\.\\d+)?|aadha|adha|half|sawa|dhai|pauna|आधा|सवा|ढाई)\\s*(kilo|kg|kilogram|gram|g|packet|packets|pack|piece|pieces|pcs|litre|liter|l|ml|किलो|ग्राम|पैकेट|पीस)?\\s+([^,;]+?)(?=\\s+(?:aur|and|और)\\s+\\d|[,;]|$)/giu;
+  const unitLine=/(\d+(?:\.\d+)?|aadha|adha|half|sawa|dhai|pauna|आधा|सवा|ढाई)\s*(kilo|kg|kilogram|gram|g|packet|packets|pack|piece|pieces|pcs|litre|liter|l|ml|किलो|ग्राम|पैकेट|पीस)?\s+([^,;]+?)(?=\s+(?:aur|and|और)\s+\d|[,;]|$)/giu;
+  const alias=(v:string)=>{const groups=[["onion","onions","pyaaz","pyaz","pyaj","piyaz","प्याज","प्याज़"],["potato","potatoes","aloo","alu","aaloo","आलू"],["tomato","tomatoes","tamatar","टमाटर"],["milk","doodh","dudh","दूध"],["sugar","cheeni","chini","चीनी"],["rice","chawal","चावल"]];return groups.find(g=>g.includes(v))?.[0]||v;};
+  const tokens=(v:string)=>norm(v).split(" ").filter(Boolean).map(alias);
   const parts=[...raw.matchAll(unitLine)].map(m=>{
    const words:Record<string,number>={aadha:.5,adha:.5,half:.5,sawa:1.25,dhai:2.5,pauna:.75,"आधा":.5,"सवा":1.25,"ढाई":2.5};
    const amount=words[m[1].toLowerCase()]??Number(m[1]);
    const unit=(m[2]||"piece").toLowerCase();
-   const phrase=norm(m[3].replace(/\\b(bech diya|becha|bechi|sold|sell|aaya|aayi|received|stock|add|aur|and)\\b/gi,""));
-   const ranked=indexed.map(i=>({i,score:norm(i.name).split(" ").filter(t=>t.length>2&&phrase.includes(t)).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+   const phrase=norm(m[3].replace(/\b(bech diya|becha|bechi|sold|sell|aaya|aayi|received|stock|add|aur|and)\b/gi,""));
+   const ignored=new Set(["bech","becha","bechi","diya","gaya","bhej","bheja","bheji","sold","sell","aaya","aayi","received","stock","add","aur","and"]);const phraseTokens=tokens(phrase).filter(t=>!ignored.has(t));
+   const ranked=indexed.map(i=>({i,score:tokens(i.name).filter(t=>phraseTokens.includes(t)).length})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
    return {amount,unit,ranked};
   }).filter(p=>p.amount>0&&p.ranked.length>0);
-  if((saleIntent||receiveIntent||parts.length>1)&&parts.length){
+  if((saleIntent||receiveIntent||uncertainIntent||parts.length>1)&&parts.length){
+   if(uncertainIntent&&!saleIntent&&!receiveIntent){setAnswer({title:"Did you mean sold or sent?",detail:"I heard bhej, which could mean sent. Please say bech diya for sold, or stock aaya for received.",warning:"No inventory changes were made."});return;}
    const unresolved=parts.some(p=>p.ranked.length>1&&p.ranked[0].score===p.ranked[1].score);
    const fractional=parts.some(p=>!Number.isInteger(p.amount)||/kg|kilo|gram|litre|liter|ml|किलो|ग्राम/.test(p.unit));
    const description=parts.map(p=>`${p.amount} ${p.unit} — ${p.ranked[0].i.name}`).join("; ");
@@ -46,6 +51,7 @@ export default function RetailAssistant(){
     setAnswer({title:"Voice checkout draft",detail:description,link:`/retailer/pos?voiceDraft=${encoded}`,linkText:"Review items in POS",warning:"No sale has been completed. Review the items and confirm checkout in POS."});return;
    }
   }
+  if((saleIntent||receiveIntent||uncertainIntent)&&!parts.length){setAnswer({title:"Could not identify the product",detail:"Please say the quantity and product name, for example 2 kilo pyaaz bech diya.",warning:"No inventory changes were made."});return;}
   if(/low stock|running low|कम स्टॉक|कम माल|कम सामान/.test(q)){
    const items=indexed.filter(i=>i.stock>0&&i.stock<=5).sort((a,b)=>a.stock-b.stock).slice(0,20);
    setAnswer({title:items.length?`${items.length} low-stock products`:"No low-stock products found",detail:"Showing products with 1–5 available units. This is current available stock, not a demand forecast.",items:items.map(i=>({id:i.productId,name:i.name,stock:i.stock})),link:"/retailer/stock",linkText:"Open inventory"});return;
