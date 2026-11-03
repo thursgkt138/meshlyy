@@ -42,6 +42,19 @@ export default function RetailAssistant(){
    }else termBuffer.push(word);
   }
   flush();
+  // Bare multi-product speech ("milk bread") has no quantities or separators.
+  // Split only when each word independently names a stocked product category
+  // and the combined phrase is not a contiguous SKU name.
+  if(terms.length===1&&wordParts.length>=2&&wordParts.length<=12&&!wordParts.some(isQty)){
+   const filler=new Set(["stock","check","show","find","sell","sold","bech","becha","diya","aaya","available","kitna","hai","the","my"]);
+   const words=wordParts.filter(w=>!filler.has(w));
+   const mappedWords=words.map(w=>productWords[w]||w);
+   const isSingleSku=indexed.some(i=>norm(i.name).includes(mappedWords.join(" ")));
+   const allIndependentlyStocked=mappedWords.length>1&&mappedWords.every(w=>indexed.some(i=>norm(i.name).split(" ").includes(w)));
+   if(!isSingleSku&&allIndependentlyStocked){
+    terms.splice(0,terms.length,...words.map(term=>({term,quantity:1})));
+   }
+  }
   const hasBasketSignal=/\b(basket|cart|bill|checkout|multiple|and|aur|plus)\b|और/.test(q)||terms.length>1;
   if(hasBasketSignal&&terms.length>1){
    const lines=terms.slice(0,20).map(t=>{
