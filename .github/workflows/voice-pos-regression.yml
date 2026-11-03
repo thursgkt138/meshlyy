@@ -23,3 +23,23 @@ jobs:
       # Replace with npm ci alone after package.json and package-lock.json are updated together.
       - run: npm install --no-save --package-lock=false @supabase/supabase-js lucide-react
       - run: npm run typecheck
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install app and Playwright dependencies without modifying lockfile
+        run: npm install --no-save --package-lock=false @supabase/supabase-js lucide-react @playwright/test
+      - run: npx playwright install --with-deps chromium
+      - name: Run isolated browser tests (no Supabase credentials)
+        run: npx playwright test
+        env:
+          CI: 'true'
+          NEXT_PUBLIC_SUPABASE_URL: ''
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
