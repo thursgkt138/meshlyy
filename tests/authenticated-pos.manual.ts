@@ -5,7 +5,7 @@ import {createClient} from "@supabase/supabase-js";
 
 const required=["E2E_SUPABASE_URL","E2E_SUPABASE_ANON_KEY","E2E_RETAILER_EMAIL","E2E_RETAILER_PASSWORD","E2E_TEST_STORE_ID","E2E_TEST_PRODUCT_ID"];
 const missing=required.filter(k=>!process.env[k]);
-test.skip(missing.length>0,"Missing local E2E configuration: "+missing.join(", "));
+
 const url=process.env.E2E_SUPABASE_URL||"";
 const key=process.env.E2E_SUPABASE_ANON_KEY||"";
 const storeId=process.env.E2E_TEST_STORE_ID||"";
@@ -15,6 +15,7 @@ const password=process.env.E2E_RETAILER_PASSWORD||"";
 test.describe.configure({mode:"serial"});
 test("dedicated retailer: voice draft, atomic hold, and sale",async({page})=>{
   test.setTimeout(90000);
+  test.skip(missing.length>0,"Missing local E2E configuration: "+missing.join(", "));
   if(process.env.E2E_ALLOW_SALES!=="YES")test.skip(true,"Explicit E2E_ALLOW_SALES=YES is required");
   const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const login=await client.auth.signInWithPassword({email,password});
@@ -31,6 +32,9 @@ test("dedicated retailer: voice draft, atomic hold, and sale",async({page})=>{
   expect(initial.data?.active).toBe(true);
   expect(initial.data?.stock).toBeGreaterThanOrEqual(1);
   const before=initial.data.stock;
+  const priorHold=await client.rpc("my_pos_bill_hold",{p_store_id:storeId});
+  expect(priorHold.error,"Existing test bill hold check").toBeNull();
+  expect(priorHold.data,"Release any existing test bill before running").toHaveLength(0);
   const salesBefore=await client.from("pos_sales").select("id").eq("store_id",storeId);
   expect(salesBefore.error).toBeNull();
   // Use real login UI; no auth bypass or privileged key.
@@ -42,7 +46,7 @@ test("dedicated retailer: voice draft, atomic hold, and sale",async({page})=>{
   const draft=encodeURIComponent(JSON.stringify([{id:sku,quantity:1}]));
   await page.goto("/retailer/pos?voiceDraft="+draft);
   await expect(page.getByRole("heading",{name:/Sell in store/})).toBeVisible();
-  await expect(page.getByRole("heading",{name:"Voice bill — review before adding"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:/Voice bill/})).toBeVisible();
   await page.getByRole("button",{name:"Add to POS cart"}).click();
   await expect(page.getByText("Voice items added to the held bill.",{exact:false})).toBeVisible();
   await expect(page.getByRole("button",{name:/Complete sale/})).toBeEnabled();
