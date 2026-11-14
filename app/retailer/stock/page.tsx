@@ -1,4 +1,5 @@
 "use client";
+import { StudioIntro } from "../components/studio-intro";
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import catalog from "../../../meshlyy-master-catalog.json";
@@ -38,6 +39,7 @@ export default function StockAdjustments(){
  const out=store.items.filter(i=>i.stock===0).length;
  const filteredHistory=history.filter(h=>(historyFilter==="all"||(historyFilter==="add"?h.delta>0:h.delta<0))&&(names.get(h.product_id)||h.product_id).toLowerCase().includes(historyQuery.toLowerCase()));
  return <main style={{background:"#f3f6f3",minHeight:"100vh",fontFamily:"Arial,sans-serif",color:"#14332e",padding:"28px max(18px,calc((100vw - 1250px)/2))"}}>
+    <StudioIntro eyebrow="Operations / Inventory" title="Every item accounted for" description="Track what is available, what needs attention and every stock movement—without losing the audit trail." shortcuts={[{label:"Browse catalogue",href:"/retailer/catalog"},{label:"Open POS",href:"/retailer/pos"}]}/>
  <nav style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:20,flexWrap:"wrap"}}><Link href="/retailer/dashboard" style={{fontWeight:800,color:"#143e38",textDecoration:"none"}}>◈ meshlyy / Retail studio</Link><div style={{display:"flex",gap:18,flexWrap:"wrap"}}><Link href="/retailer/dashboard">Dashboard</Link><Link href="/retailer/pos">POS checkout</Link><Link href="/retailer/sales">Sales & reports</Link></div></nav>
  <p style={{letterSpacing:2,fontSize:12,color:"#658478",marginTop:40}}>OPERATIONS / INVENTORY CONTROL</p><h1 style={{fontSize:"clamp(36px,5vw,54px)",letterSpacing:"-2px",margin:"10px 0"}}>Stock control centre</h1>
  <p style={{color:"#668277"}}>Record restocks, damaged goods, returns and physical stock-count corrections. Every adjustment is saved with its before and after quantities.</p>
