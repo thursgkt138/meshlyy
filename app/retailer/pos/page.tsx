@@ -1,4 +1,5 @@
 "use client";
+import { StudioIntro } from "../components/studio-intro";
 import {decodePosDraft} from "../assistant/pos-draft";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import Link from "next/link";
@@ -114,6 +115,7 @@ export default function RetailerPOS(){
  const today=new Date().toDateString();
  const todaySales=useMemo(()=>sales.filter(s=>new Date(s.created_at).toDateString()===today),[sales,today]);
  return <main className="pos-studio">
+    <StudioIntro eyebrow="In-store / Point of sale" title="A faster counter" description="Find products, build a bill and complete sales with inventory connected to every checkout." shortcuts={[{label:"Sales history",href:"/retailer/sales"},{label:"Stock control",href:"/retailer/stock"}]}/>
   <div className="pos-heading"><div><div className="pos-eyebrow">RETAIL OPERATIONS <span> / </span> POINT OF SALE</div><h1>Sell in store<span className="pos-title-dot">.</span></h1><p>Fast checkout, connected to your live inventory.</p></div><div className="pos-heading-actions"><Link href="/retailer/sales">Sales history <ArrowUpRight size={16}/></Link><Link href="/retailer/stock">Manage stock <ArrowUpRight size={16}/></Link></div></div>
   {store.loading?<p className="pos-message">Loading store…</p>:!store.user?<p className="pos-message">Sign in at <Link href="/retailer/login">retailer login</Link>.</p>:!store.storeId?<p className="pos-message">Create a store from the <Link href="/retailer/catalog">catalogue</Link> first.</p>:<>
   <div className="pos-summary"><div className="pos-stat"><span className="pos-stat-icon"><Package size={19}/></span><div><small>Available products</small><strong>{available.length}</strong></div></div><div className="pos-stat"><span className="pos-stat-icon"><AlertTriangle size={19}/></span><div><small>Low stock</small><strong>{store.items.filter(i=>i.stock>0&&i.stock<=5).length}</strong></div></div><div className="pos-stat"><span className="pos-stat-icon"><ReceiptText size={19}/></span><div><small>Recent transactions</small><strong>{sales.length}</strong></div></div><div className="pos-stat"><span className="pos-stat-icon"><IndianRupee size={19}/></span><div><small>Today's POS sales</small><strong>{money(todaySales.reduce((sum,x)=>sum+Number(x.total),0))}</strong></div></div></div>
