@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./meshlyy-app-theme.css";
 export const metadata: Metadata = {
   title: "Meshlyy — Your neighbourhood. Connected.",
   description: "Discover nearby stores, reserve what you need, and pick it up locally.",
