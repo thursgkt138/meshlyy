@@ -1,6 +1,7 @@
 "use client";
 import {useState} from "react";
 import "./retailer-interiors.css";
+import "../meshlyy-app-theme.css";
 import {LayoutDashboard,ClipboardList,ShoppingCart,PackageSearch,Boxes,ChartNoAxesCombined,Store,Settings2,CircleHelp,Sparkles} from "lucide-react";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
