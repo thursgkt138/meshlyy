@@ -1,5 +1,6 @@
 "use client";
 
+import { StudioIntro } from "../components/studio-intro";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import catalog from "../../../meshlyy-master-catalog.json";
@@ -146,6 +147,7 @@ export default function RetailerDashboard(){
     if(error)setNotice(error);else{setEditing(null);setNotice("Inventory saved in Supabase.");}
   };
   return <main style={{minHeight:"100vh",background:"#f4f6f3",color:"#102f30",padding:"28px max(20px,calc((100vw - 1280px)/2))",fontFamily:"Arial,sans-serif"}}>
+    <StudioIntro eyebrow="Store intelligence / Overview" title="Your shop, in focus" description="A clearer view of your neighbourhood business. Stay close to orders, stock and every sale." shortcuts={[{label:"Online orders",href:"/retailer/orders"},{label:"New sale",href:"/retailer/pos"},{label:"Inventory",href:"/retailer/stock"}]}/>
     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:20,flexWrap:"wrap",marginBottom:24}}>
       <div><p style={{fontSize:11,fontWeight:650,letterSpacing:1.2,color:"#82918a",margin:"0 0 9px"}}>STORE OVERVIEW</p><h1 style={{fontSize:"clamp(25px,2.8vw,34px)",fontWeight:700,letterSpacing:"-1.2px",margin:"0 0 7px"}}>Good to see you.</h1><p style={{fontSize:13,color:"#73847b",margin:0}}>Here’s what’s happening at your store today.</p></div>
       <Link href="/retailer/orders" style={{display:"inline-flex",alignItems:"center",padding:"11px 15px",border:"1px solid #e2e9e4",background:"#fff",borderRadius:10,fontSize:12,fontWeight:650,color:"#234e3c",textDecoration:"none"}}>View orders →</Link>
