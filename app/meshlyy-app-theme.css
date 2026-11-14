@@ -143,3 +143,29 @@
   .ret-shell .ret-sidebar,.ret-shell .ret-topbar,.ret-shell .ret-bottom-nav {display:none!important}
   .ret-shell .ret-page-content :is(section,article) {box-shadow:none!important}
 }
+
+/* Component-level editorial layout, shared by retailer operational pages. */
+.mesh-studio-intro {
+  position:relative;isolation:isolate;display:flex;align-items:center;justify-content:space-between;
+  min-height:200px;overflow:hidden;padding:28px 32px;margin:0 0 26px;
+  border:1px solid #cfdcd3;border-radius:22px;
+  background:linear-gradient(120deg,#f7faf7 0%,#edf3ee 48%,#dce9df 100%);
+  box-shadow:0 12px 32px #405c4810;
+}
+.mesh-studio-intro-copy {position:relative;z-index:2;max-width:650px}
+.mesh-studio-kicker {display:flex;align-items:center;gap:9px;font-size:10px;letter-spacing:1.65px;font-weight:700;color:#547363;text-transform:uppercase}
+.mesh-studio-spark {font-size:18px;line-height:1}
+.mesh-studio-intro h2 {font-size:clamp(27px,3.5vw,42px)!important;line-height:1.1!important;font-weight:700!important;letter-spacing:-1.6px!important;margin:12px 0 9px!important;color:#304b3d!important}
+.mesh-studio-intro h2 span {color:#7c9b86}
+.mesh-studio-intro p {font-size:13px;line-height:1.65;color:#64796b;max-width:470px}
+.mesh-studio-shortcuts {display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.mesh-studio-shortcuts a {display:inline-flex;align-items:center;gap:18px;min-height:38px;padding:9px 13px;background:#fff;color:#3d5d4a;border:1px solid #cbd8cf;border-radius:9px;font-size:11px;font-weight:650;text-decoration:none;transition:transform .2s,border-color .2s,box-shadow .2s}
+.mesh-studio-shortcuts a:hover {transform:translateY(-2px);border-color:#93b09c;box-shadow:0 6px 14px #43595015}
+.mesh-studio-intro-art {position:absolute;right:5%;top:50%;width:220px;height:220px;transform:translateY(-50%);opacity:.9;pointer-events:none}
+.mesh-orbit {position:absolute;border:1px solid #88a79480;border-radius:50%;inset:15px;transform:rotate(-24deg)}
+.mesh-orbit-two {inset:42px;border-style:dashed;transform:rotate(35deg)}
+.mesh-studio-core {position:absolute;inset:70px;display:grid;place-items:center;border-radius:22px;background:linear-gradient(145deg,#496a55,#304b3d);box-shadow:0 14px 30px #29493536;color:#fff;font-size:33px;font-weight:700;transform:rotate(-9deg)}
+.mesh-studio-core span {position:absolute;top:8px;right:9px;font-size:12px;color:#d3ebd8}
+.mesh-studio-node {position:absolute;display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:#fff;border:1px solid #bed0c2;color:#557663;font-size:10px;font-weight:700;box-shadow:0 7px 15px #34554014}
+.mesh-node-a {top:15px;left:42px}.mesh-node-b {right:6px;top:65px}.mesh-node-c {bottom:11px;left:60px}
+@media(max-width:700px) {.mesh-studio-intro{padding:24px 20px;min-height:190px}.mesh-studio-intro-art{right:-100px;opacity:.22}.mesh-studio-intro-copy{max-width:100%}.mesh-studio-intro h2{font-size:30px!important}}
