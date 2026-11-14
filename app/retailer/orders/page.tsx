@@ -1,4 +1,5 @@
 "use client";
+import { StudioIntro } from "../components/studio-intro";
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import "./orders-studio.css";
@@ -80,6 +81,7 @@ export default function RetailerOrders(){
  const completedCount=orders.filter(o=>o.status==="completed").length;
  const activeCount=pendingCount+acceptedCount;
  return <main className="orders-studio">
+    <StudioIntro eyebrow="Operations / Pickup" title="From request to handover" description="A calmer way to manage incoming reservations, prepare orders and complete verified pickups." shortcuts={[{label:"Store overview",href:"/retailer/dashboard"},{label:"Manage stock",href:"/retailer/stock"}]}/>
   <div className="orders-heading"><div><p className="orders-eyebrow">RETAIL OPERATIONS <span>/</span> ONLINE ORDERS</p><h1>Pickup orders<span className="orders-dot">.</span></h1><p className="orders-subtitle">From new requests to verified handovers, all in one place.</p></div><div className="orders-heading-actions"><span className="orders-live"><span/> Live updates</span><button type="button" onClick={()=>void refresh()}><RefreshCw size={16}/> Refresh</button></div></div>
   {store.loading?<p className="orders-message">Loading your shop…</p>:store.error?<p role="alert">{store.error}</p>:!store.user?<div className="orders-message">Please <Link href="/retailer/login">sign in</Link> to view orders.</div>:!store.storeId?<div className="orders-message">Please <Link href="/retailer/catalog">create your shop</Link> first.</div>:<>
   <div className="orders-stats">
