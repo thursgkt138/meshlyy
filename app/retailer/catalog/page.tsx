@@ -1,5 +1,6 @@
 "use client";
 
+import { StudioIntro } from "../components/studio-intro";
 import { useEffect, useMemo, useState } from "react";
 import catalog from "../../../meshlyy-master-catalog.json";
 import imageReferences from "../../../meshlyy-source-image-references.json";
@@ -35,6 +36,7 @@ export default function RetailerCatalogPage() {
   const save = async () => { if (!selected) return; const p = Number(price), s = Number(stock); if (!Number.isFinite(p) || p <= 0 || !Number.isInteger(s) || s < 0) return; const error=await remote.save({productId:selected.id,price:p,stock:s,active:s>0}); if(error)setNotice(error);else {setNotice("Product saved to your shop.");setSelected(null);} };
   const style = { background:"#f8faf8", color:"#102e30", minHeight:"100vh", padding:"32px max(20px, calc((100vw - 1100px)/2))", fontFamily:"Arial, sans-serif" } as const;
   return <main style={style}>
+    <StudioIntro eyebrow="Products / Catalogue" title="Build a better shelf" description="Find the products your customers want, set your prices and keep your store ready for pickup." shortcuts={[{label:"Stock control",href:"/retailer/stock"},{label:"Store overview",href:"/retailer/dashboard"}]}/>
     <a href="/" style={{color:"#166d64",textDecoration:"none"}}>← Meshlyy home</a>
     <p style={{letterSpacing:3,fontSize:12,marginTop:35,color:"#47736b"}}>MESHLYY · RETAILER STUDIO</p>
     <h1 style={{fontSize:"clamp(30px,5vw,52px)",margin:"10px 0"}}>Stock your neighbourhood shop.</h1>
