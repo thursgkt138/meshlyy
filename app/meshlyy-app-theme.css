@@ -1,0 +1,145 @@
+/* Meshlyy unified application language — derived from the emerald landing page.
+   Presentation only: no business logic, inventory or order state changes. */
+:root {
+  --mesh-forest: #435950;
+  --mesh-forest-deep: #374e45;
+  --mesh-emerald: #506b5e;
+  --mesh-ink: #354c43;
+  --mesh-muted: #5b6d66;
+  --mesh-paper: #f3f3f4;
+  --mesh-surface: #ffffff;
+  --mesh-sage: #e9eeeb;
+  --mesh-stroke: #d6dbd9;
+  --mesh-focus: #537f6b;
+  --mesh-radius: 16px;
+  --mesh-shadow: 0 14px 42px rgba(46,67,56,.055);
+  --mesh-gradient: linear-gradient(145deg,#fdfefd 0%,#f1f4f2 45%,#e6eeea 100%);
+}
+/* The retailer shell is deliberately calmer than the consumer storefront. */
+.ret-shell {
+  --ret-ink: var(--mesh-ink) !important;
+  --ret-muted: var(--mesh-muted) !important;
+  --ret-line: var(--mesh-stroke) !important;
+  --ret-green: var(--mesh-forest) !important;
+  background: var(--mesh-gradient) !important;
+  color: var(--mesh-ink) !important;
+  font-family: var(--meshlyy-font), "DM Sans", Arial, sans-serif !important;
+}
+.ret-shell .ret-sidebar {
+  background: #fbfcfb !important;
+  border-color: var(--mesh-stroke) !important;
+}
+.ret-shell .ret-brand {color:var(--mesh-ink)!important;letter-spacing:-1.2px}
+.ret-shell .ret-brand-mark {
+  color:var(--mesh-forest)!important;
+  background:linear-gradient(145deg,#dce8df,#eff3ef)!important;
+  border-radius:12px!important;
+}
+.ret-shell .ret-brand small,.ret-shell .ret-nav-caption {color:#718078!important}
+.ret-shell .ret-store-card {
+  background:linear-gradient(130deg,#f0f4f1,#e9efeb)!important;
+  border:1px solid var(--mesh-stroke)!important;
+  box-shadow:0 6px 18px #354c4308;
+}
+.ret-shell .ret-store-avatar {background:#d7e4dc!important;color:var(--mesh-forest)!important}
+.ret-shell .ret-nav-link {
+  color:#52675b!important;
+  transition:background .2s ease,color .2s ease,transform .2s ease!important;
+}
+.ret-shell .ret-nav-link:hover {background:#edf2ee!important;color:var(--mesh-forest-deep)!important;transform:translateX(2px)}
+.ret-shell .ret-nav-link[aria-current="page"] {
+  background:linear-gradient(110deg,#dce9df,#eaf0ec)!important;
+  color:#304f3f!important;
+  box-shadow:inset 3px 0 #527763;
+}
+.ret-shell .ret-topbar {
+  background:rgba(251,253,251,.91)!important;
+  border-bottom:1px solid var(--mesh-stroke)!important;
+  backdrop-filter:blur(18px)!important;
+}
+.ret-shell .ret-new-sale {
+  background:var(--mesh-forest)!important;
+  color:white!important;
+  box-shadow:0 5px 16px #43595025;
+  transition:transform .2s ease,background .2s ease,box-shadow .2s ease;
+}
+.ret-shell .ret-new-sale:hover {background:var(--mesh-forest-deep)!important;transform:translateY(-2px);box-shadow:0 9px 20px #4359502c}
+.ret-shell .ret-user-avatar,.ret-shell .ret-menu-button {background:#e4ede6!important;color:var(--mesh-forest)!important}
+.ret-shell .ret-page-content > main:not(.pos-studio) {
+  background:transparent!important;
+  color:var(--mesh-ink)!important;
+  font-family:var(--meshlyy-font),"DM Sans",Arial,sans-serif!important;
+}
+.ret-shell .ret-page-content h1,.ret-shell .ret-page-content h2,.ret-shell .ret-page-content h3 {
+  color:var(--mesh-ink);
+  letter-spacing:-.035em;
+}
+.ret-shell .ret-page-content > main:not(.pos-studio) h1 {font-weight:690!important}
+.ret-shell .ret-page-content > main:not(.pos-studio) h2 {font-weight:650!important}
+.ret-shell .ret-page-content :is(section,article,aside)[style*="background: white"],
+.ret-shell .ret-page-content :is(section,article,aside)[style*="background: rgb(255"],
+.ret-shell .ret-page-content :is(section,article,aside)[style*="background: #fff"] {
+  border-color:var(--mesh-stroke)!important;
+  border-radius:var(--mesh-radius)!important;
+  box-shadow:var(--mesh-shadow);
+}
+.ret-shell .ret-page-content :is(button,a,input,select,textarea):focus-visible,
+.ret-shell :is(button,a):focus-visible {
+  outline:3px solid var(--mesh-focus)!important;
+  outline-offset:3px!important;
+}
+.ret-shell .ret-page-content :is(input:not([type=checkbox]),select,textarea) {
+  border-color:#cbd7cf!important;
+  transition:border-color .18s ease,box-shadow .18s ease!important;
+}
+.ret-shell .ret-page-content :is(input:not([type=checkbox]),select,textarea):focus {
+  border-color:var(--mesh-focus)!important;
+  box-shadow:0 0 0 3px #537f6b20!important;
+}
+.ret-shell .ret-page-content button:not(:disabled) {transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.ret-shell .ret-page-content button:not(:disabled):active {transform:scale(.985)}
+.ret-shell .ret-page-content img {object-fit:contain}
+.ret-shell .ret-page-content :is(table, [role=table]) {border-collapse:separate;border-spacing:0}
+.ret-shell .ret-page-content :is(th,[role=columnheader]) {color:#526b5d;font-size:.77rem;letter-spacing:.025em}
+.ret-shell .ret-page-content :is(tr,[role=row]):hover {background-color:#f3f7f4}
+.ret-shell .ret-bottom-nav {
+  background:rgba(251,253,251,.96)!important;
+  border-color:var(--mesh-stroke)!important;
+  backdrop-filter:blur(16px);
+}
+.ret-shell .ret-bottom-nav a[aria-current=page] {color:var(--mesh-forest)!important}
+.ret-shell .ret-interior-link,.ret-shell .ret-interior-heading {color:var(--mesh-forest)!important}
+.ret-shell .ret-help-shortcuts a {border-color:var(--mesh-stroke)!important;box-shadow:0 6px 20px #43595009}
+.ret-shell .ret-help-shortcuts a:hover {background:#edf3ee!important;transform:translateY(-2px)}
+/* Apply the same palette to future consumer app pages using a dedicated .mesh-consumer root. */
+.mesh-consumer {
+  color:var(--mesh-ink);
+  background:var(--mesh-gradient);
+  font-family:var(--meshlyy-font),"DM Sans",Arial,sans-serif;
+  min-height:100vh;
+}
+.mesh-consumer .mesh-card {
+  background:var(--mesh-surface);border:1px solid var(--mesh-stroke);
+  border-radius:var(--mesh-radius);box-shadow:var(--mesh-shadow);
+  transition:transform .24s ease,box-shadow .24s ease,border-color .24s ease;
+}
+.mesh-consumer .mesh-card:hover {transform:translateY(-3px);box-shadow:0 18px 44px #354c4314;border-color:#b7c8bc}
+.mesh-consumer .mesh-primary {
+  background:var(--mesh-forest);color:#fff;border-radius:12px;
+  padding:12px 18px;font-weight:650;transition:transform .2s,background .2s;
+}
+.mesh-consumer .mesh-primary:hover {background:var(--mesh-forest-deep);transform:translateY(-2px)}
+.mesh-consumer .mesh-muted {color:var(--mesh-muted)}
+@media(max-width:800px) {
+  .ret-shell .ret-sidebar {box-shadow:16px 0 44px #263d3420}
+  .ret-shell .ret-page-content > main:not(.pos-studio) {padding:20px 15px 105px!important}
+  .ret-shell .ret-bottom-nav {padding-bottom:max(10px,env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce) {
+  .ret-shell *, .mesh-consumer * {transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
+}
+@media print {
+  .ret-shell {background:white!important}
+  .ret-shell .ret-sidebar,.ret-shell .ret-topbar,.ret-shell .ret-bottom-nav {display:none!important}
+  .ret-shell .ret-page-content :is(section,article) {box-shadow:none!important}
+}
